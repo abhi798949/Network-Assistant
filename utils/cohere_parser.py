@@ -1,7 +1,7 @@
 
 import cohere
 
-co = cohere.Client("iJjTtzEhLHr1tWrn5TtWm7qxNmXt4VucN5gD3bXs")  # Replace with your API key
+co = cohere.Client("")  # Replace with your API key
 
 def get_action_from_prompt(prompt):
     # Always returns config commands to apply or audit
