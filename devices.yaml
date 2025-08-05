@@ -1,0 +1,31 @@
+devices:
+  - name: R1
+    ip: "192.168.29.201"
+    device_type: "cisco_ios"
+    username: "cisco"
+    password: "admin"
+
+  - name: R2
+    ip: "192.168.29.124"
+    device_type: "cisco_ios"
+    username: "cisco"
+    password: "admin"
+
+  - name: R3
+    ip: "192.168.29.47"
+    device_type: "cisco_ios"
+    username: "cisco"
+    password: "admin"
+
+  - name: R4
+    ip: "192.168.29.223"
+    device_type: "cisco_ios"
+    username: "cisco"
+    password: "admin"
+  
+  - name: RSDMN-55A2-P1
+    ip: "10.253.22.102"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+  

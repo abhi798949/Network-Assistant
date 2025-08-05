@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Assistant</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+        .device-result {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .config-diff {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .command-output {
+            background-color: #1e1e1e;
+            color: #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .loading {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="mb-4">🌐 Network Assistant</h1>
+        <p class="text-muted">Enter prompt like: 'audit R1', 'configure BGP on R2', etc.</p>
+        
+        <!-- Device Selection -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Device Selection</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="selectAll">
+                    <label class="form-check-label" for="selectAll">
+                        <strong>Select All Devices</strong>
+                    </label>
+                </div>
+                
+                <div class="row">
+                    {% for device in devices %}
+                    <div class="col-md-6 col-lg-4 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input device-checkbox" type="checkbox" value="{{ device }}" id="device-{{ loop.index }}">
+                            <label class="form-check-label" for="device-{{ loop.index }}">
+                                {{ device }}
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Command Input -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Network Request</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <textarea class="form-control" id="promptText" rows="4" placeholder="Enter your network request..."></textarea>
+                </div>
+                
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary" id="executeBtn">
+                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
+                        Execute Command
+                    </button>
+                    <button class="btn btn-success" id="backupBtn">
+                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
+                        Backup Config
+                    </button>
+                    <button class="btn btn-warning" id="restoreBtn">
+                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
+                        Restore Config
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup File Selection -->
+        <div class="card mb-4" id="backupFilesCard" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Backup Files</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshBackupFiles()">🔄 Refresh</button>
+            </div>
+            <div class="card-body">
+                <select class="form-select mb-3" id="backupFiles" multiple size="5">
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <small class="text-muted">Select backup files to restore (hold Ctrl/Cmd for multiple selection)</small>
+                
+            </div>
+        </div>
+
+
+        <!-- Results Area -->
+        <div id="resultsArea"></div>
+
+        <!-- Scheduled Backup -->
+        <hr class="my-5">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📅 Schedule Backup using Date & Time</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="scheduleDevices" class="form-label">Select Devices</label>
+                        <select class="form-select" id="scheduleDevices" multiple>
+                            {% for device in devices %}
+                            <option value="{{ device }}">{{ device }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="scheduleDate" class="form-label">Date</label>
+                        <input type="date" class="form-control" id="scheduleDate">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="scheduleTime" class="form-label">Time</label>
+                        <input type="time" class="form-control" id="scheduleTime" value="01:00">
+                    </div>
+                </div>
+                
+                <button class="btn btn-info" id="scheduleBtn">
+                    <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
+                    Schedule Backup
+                </button>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container position-fixed bottom-0 end-0 p-3">
+            <div id="toast" class="toast" role="alert">
+                <div class="toast-header">
+                    <strong class="me-auto">Network Assistant</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body" id="toastBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let selectedDevices = [];
+        const toast = new bootstrap.Toast(document.getElementById('toast'));
+
+        // Utility functions
+        function showToast(message, type = 'info') {
+            const toastBody = document.getElementById('toastBody');
+            toastBody.textContent = message;
+            
+            const toastElement = document.getElementById('toast');
+            toastElement.className = `toast ${type === 'error' ? 'bg-danger text-white' : type === 'success' ? 'bg-success text-white' : ''}`;
+            toast.show();
+        }
+
+        function toggleLoading(buttonId, isLoading) {
+            const button = document.getElementById(buttonId);
+            const spinner = button.querySelector('.loading');
+            
+            if (isLoading) {
+                spinner.style.display = 'inline-block';
+                button.disabled = true;
+            } else {
+                spinner.style.display = 'none';
+                button.disabled = false;
+            }
+        }
+
+        function getSelectedDevices() {
+            const checkboxes = document.querySelectorAll('.device-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function updateBackupFiles() {
+            const devices = getSelectedDevices();
+            if (devices.length === 1) {
+                // Show backup files for single device
+                fetch(`/get_backup_files?device=${encodeURIComponent(devices[0])}`)
+                    .then(response => response.json())
+                    .then(files => {
+                        const select = document.getElementById('backupFiles');
+                        select.innerHTML = '';
+                        files.forEach(file => {
+                            const option = document.createElement('option');
+                            option.value = file;
+                            option.textContent = file;
+                            select.appendChild(option);
+                        });
+                        document.getElementById('backupFilesCard').style.display = files.length > 0 ? 'block' : 'none';
+                        document.getElementById('downloadArea').style.display = files.length > 0 ? 'block' : 'none';
+                    });
+            } else {
+                document.getElementById('backupFilesCard').style.display = 'none';
+            }
+        }
+
+        function refreshBackupFiles() {
+            updateBackupFiles();
+            showToast('Backup files refreshed', 'success');
+        }
+        
+        // Restore Devices
+        document.getElementById('restoreBtn').addEventListener('click', function() {
+            const devices = getSelectedDevices();
+            const files = Array.from(document.getElementById('backupFiles').selectedOptions).map(o => o.value);
+            
+            if (devices.length === 0 || files.length === 0) {
+                showToast('Please select devices and backup files', 'error');
+                return;
+            }
+            
+            toggleLoading('restoreBtn', true);
+            
+            fetch('/restore_devices', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({devices, files})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else {
+                    displayRestoreResults(data.results);
+                }
+            })
+            .catch(error => {
+                showToast('Restore failed: ' + error.message, 'error');
+            })
+            .finally(() => {
+                toggleLoading('restoreBtn', false);
+            });
+        });
+
+
+        // Event listeners
+        document.getElementById('selectAll').addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.device-checkbox');
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateBackupFiles();
+        });
+
+        document.querySelectorAll('.device-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const allCheckboxes = document.querySelectorAll('.device-checkbox');
+                const checkedCheckboxes = document.querySelectorAll('.device-checkbox:checked');
+                
+                document.getElementById('selectAll').checked = allCheckboxes.length === checkedCheckboxes.length;
+                updateBackupFiles();
+            });
+        });
+
+        // Execute Command
+        document.getElementById('executeBtn').addEventListener('click', function() {
+            const devices = getSelectedDevices();
+            const prompt = document.getElementById('promptText').value.trim();
+            
+            if (devices.length === 0 || !prompt) {
+                showToast('Please select devices and enter a prompt', 'error');
+                return;
+            }
+            
+            toggleLoading('executeBtn', true);
+            
+            fetch('/execute_command', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({devices, prompt})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else {
+                    displayExecutionResults(data);
+                }
+            })
+            .catch(error => {
+                showToast('Request failed: ' + error.message, 'error');
+            })
+            .finally(() => {
+                toggleLoading('executeBtn', false);
+            });
+        });
+
+        // Backup Devices
+        document.getElementById('backupBtn').addEventListener('click', function() {
+            const devices = getSelectedDevices();
+            
+            if (devices.length === 0) {
+                showToast('Please select devices to backup', 'error');
+                return;
+            }
+            
+            toggleLoading('backupBtn', true);
+            
+            fetch('/backup_devices', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({devices})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else {
+                    displayBackupResults(data.results);
+                    updateBackupFiles(); // Refresh backup files list
+                }
+            })
+            .catch(error => {
+                showToast('Backup failed: ' + error.message, 'error');
+            })
+            .finally(() => {
+                toggleLoading('backupBtn', false);
+            });
+        });
+
+        
+
+        // Schedule Backup
+        document.getElementById('scheduleBtn').addEventListener('click', function() {
+            const devices = Array.from(document.getElementById('scheduleDevices').selectedOptions).map(o => o.value);
+            const date = document.getElementById('scheduleDate').value;
+            const time = document.getElementById('scheduleTime').value;
+            
+            if (devices.length === 0 || !date || !time) {
+                showToast('Please fill all schedule fields', 'error');
+                return;
+            }
+            
+            toggleLoading('scheduleBtn', true);
+            
+            fetch('/schedule_backup', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({devices, date, time})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else {
+                    showToast(data.message, 'success');
+                }
+            })
+            .catch(error => {
+                showToast('Schedule failed: ' + error.message, 'error');
+            })
+            .finally(() => {
+                toggleLoading('scheduleBtn', false);
+            });
+        });
+
+        // Display functions
+        function displayExecutionResults(data) {
+            let html = '<div class="card"><div class="card-header"><h5>📋 Configuration Applied</h5></div>';
+            html += '<div class="card-body">';
+            html += '<div class="command-output">' + data.commands.join('\n') + '</div>';
+            html += '</div></div>';
+            
+            data.device_results.forEach(result => {
+                html += '<div class="device-result">';
+                html += `<h6>${result.success ? '✅' : '❌'} DEVICE: ${result.device}</h6>`;
+                
+                if (result.message) {
+                    html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">${result.message}</div>`;
+                }
+                
+                result.command_outputs.forEach(output => {
+                    html += `<h6>Command: ${output.command}</h6>`;
+                    html += `<div class="command-output">${output.output}</div>`;
+                });
+                
+                if (result.config_diff) {
+                    html += '<h6>🆚 Changes in Configuration:</h6>';
+                    html += `<div class="config-diff">${result.config_diff}</div>`;
+                }
+                
+                html += '</div>';
+            });
+            
+            document.getElementById('resultsArea').innerHTML = html;
+        }
+
+        function displayBackupResults(results) {
+            let html = '<div class="card"><div class="card-header"><h5>💾 Backup Results</h5></div><div class="card-body">';
+            
+            results.forEach(result => {
+                html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">`;
+                html += `<strong>${result.device}:</strong> ${result.message}`;
+                html += '</div>';
+            });
+            
+            html += '</div></div>';
+            document.getElementById('resultsArea').innerHTML = html;
+        }
+
+        function displayRestoreResults(results) {
+            let html = '<div class="card"><div class="card-header"><h5>🔧 Restore Results</h5></div><div class="card-body">';
+            
+            results.forEach(result => {
+                html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">`;
+                html += `<strong>${result.device}:</strong> `;
+                
+                if (result.success && result.messages) {
+                    html += result.messages.join('<br>');
+                } else if (result.message) {
+                    html += result.message;
+                }
+                
+                html += '</div>';
+            });
+            
+            html += '</div></div>';
+            document.getElementById('resultsArea').innerHTML = html;
+        }
+
+        // Set today's date as default
+        document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
+    </script>
+</body>
+</html>
