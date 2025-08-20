@@ -1,795 +1,1167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Assistant</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .spinner-border-sm {
-            width: 1rem;
-            height: 1rem;
-        }
-        .device-result {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .config-diff {
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 4px;
-            padding: 10px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .command-output {
-            background-color: #1e1e1e;
-            color: #ddd;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .loading {
-            display: none;
-        }
-        .device-search {
-            position: relative;
-            margin-bottom: 15px;
-        }
-        .search-icon {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6c757d;
-            z-index: 10;
-        }
-        .device-search input {
-            padding-left: 40px;
-        }
-        .device-item {
-            transition: all 0.2s ease;
-        }
-        .device-item.hidden {
-            display: none !important;
-        }
-        .device-item.highlighted {
-            background-color: #fff3cd;
-            border-radius: 4px;
-            padding: 2px 4px;
-        }
-        .no-devices-found {
-            text-align: center;
-            color: #6c757d;
-            font-style: italic;
-            padding: 20px;
-            display: none;
-        }
-        .clear-search {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #6c757d;
-            cursor: pointer;
-            z-index: 10;
-            font-size: 18px;
-            line-height: 1;
-            padding: 0;
-            width: 20px;
-            height: 20px;
-            display: none;
-        }
-        .clear-search:hover {
-            color: #495057;
-        }
-        .device-count {
-            font-size: 0.875rem;
-            color: #6c757d;
-            margin-top: 10px;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Network Assistant</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .spinner-border-sm { width: 1rem; height: 1rem; }
+    .device-result { 
+      border: 1px solid #ddd; 
+      border-radius: 8px; 
+      padding: 15px; 
+      margin-bottom: 15px; 
+      transition: all 0.3s ease;
+    }
+    .device-result.healthy { 
+      border-color: #28a745; 
+      background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+      box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1);
+    }
+    .device-result.warning { 
+      border-color: #ffc107; 
+      background: linear-gradient(135deg, #fffef7 0%, #fff3cd 100%);
+      box-shadow: 0 2px 8px rgba(255, 193, 7, 0.1);
+    }
+    .device-result.critical { 
+      border-color: #dc3545; 
+      background: linear-gradient(135deg, #fff8f8 0%, #f8d7da 100%);
+      box-shadow: 0 2px 8px rgba(220, 53, 69, 0.1);
+    }
+    .config-diff { 
+      background: #f8f9fa; 
+      border: 1px solid #e9ecef; 
+      border-radius: 4px; 
+      padding: 12px; 
+      font-family: 'Courier New', monospace; 
+      white-space: pre-wrap; 
+      max-height: 400px; 
+      overflow-y: auto; 
+      font-size: 0.875rem;
+    }
+    .command-output { 
+      background: #1e1e1e; 
+      color: #ddd; 
+      padding: 12px; 
+      border-radius: 6px; 
+      font-family: 'Courier New', monospace; 
+      white-space: pre-wrap; 
+      max-height: 300px; 
+      overflow-y: auto; 
+      font-size: 0.875rem;
+      border: 1px solid #333;
+    }
+    .health-output { 
+      background: #f8f9fa; 
+      color: #333; 
+      padding: 12px; 
+      border-radius: 6px; 
+      font-family: 'Courier New', monospace; 
+      white-space: pre-wrap; 
+      max-height: 250px; 
+      overflow-y: auto; 
+      border: 1px solid #dee2e6; 
+      font-size: 0.875rem;
+    }
+    .loading { display: none; }
+    .device-search { position: relative; margin-bottom: 15px; }
+    .search-icon { 
+      position: absolute; 
+      left: 12px; 
+      top: 50%; 
+      transform: translateY(-50%); 
+      color: #6c757d; 
+      z-index: 10; 
+    }
+    .device-search input { padding-left: 40px; }
+    .device-item { 
+      transition: all 0.2s ease; 
+      padding: 6px;
+      border-radius: 4px;
+    }
+    .device-item:hover { background-color: #f8f9fa; }
+    .device-item.hidden { display: none !important; }
+    .no-devices-found { 
+      text-align: center; 
+      color: #6c757d; 
+      font-style: italic; 
+      padding: 20px; 
+      display: none; 
+    }
+    .clear-search { 
+      position: absolute; 
+      right: 12px; 
+      top: 50%; 
+      transform: translateY(-50%); 
+      background: none; 
+      border: none; 
+      color: #6c757d; 
+      cursor: pointer; 
+      z-index: 10; 
+      font-size: 18px; 
+      line-height: 1; 
+      padding: 0; 
+      width: 20px; 
+      height: 20px; 
+      display: none; 
+    }
+    .device-count { 
+      font-size: 0.875rem; 
+      color: #6c757d; 
+      margin-top: 10px; 
+    }
+    .health-summary { 
+      font-size: 1.1em; 
+      font-weight: 600; 
+      margin-bottom: 15px; 
+      padding: 12px; 
+      border-radius: 6px; 
+      border-left: 4px solid;
+    }
+    .health-summary.healthy { 
+      background: #d4edda; 
+      border-left-color: #28a745; 
+      color: #155724;
+    }
+    .health-summary.warning { 
+      background: #fff3cd; 
+      border-left-color: #ffc107; 
+      color: #856404;
+    }
+    .health-summary.critical { 
+      background: #f8d7da; 
+      border-left-color: #dc3545; 
+      color: #721c24;
+    }
+    .health-issues, .health-warnings { margin: 10px 0; }
+    .health-issues ul, .health-warnings ul { margin: 5px 0; padding-left: 20px; }
+    .health-issues li, .health-warnings li { margin: 3px 0; }
+    .collapsible-section { margin-top: 15px; }
+    .collapsible-header { 
+      cursor: pointer; 
+      user-select: none; 
+      padding: 10px; 
+      background: #f8f9fa; 
+      border: 1px solid #dee2e6; 
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+    .collapsible-header:hover { 
+      background: #e9ecef; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .collapsible-content { 
+      display: none; 
+      margin-top: 10px;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    .collapsible-content.show { display: block; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .btn-group-custom { gap: 8px; }
+    .card { 
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+      border: none;
+      margin-bottom: 20px;
+    }
+    .card-header { 
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border-bottom: 1px solid #dee2e6;
+      font-weight: 600;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .status-healthy { background: #d4edda; color: #155724; }
+    .status-warning { background: #fff3cd; color: #856404; }
+    .status-critical { background: #f8d7da; color: #721c24; }
+    .upload-zone {
+      border: 2px dashed #dee2e6;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    .upload-zone:hover {
+      border-color: #007bff;
+      background-color: #f8f9fa;
+    }
+    .command-preview {
+      background: #2d3748;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #4a5568;
+    }
+  </style>
 </head>
 <body>
-    <div class="container mt-4">
-        <h1 class="mb-4">🌐 Network Assistant</h1>
-        <p class="text-muted">Enter prompt like: 'audit R1', 'configure BGP on R2', etc.</p>
-        
-        <!-- Device Selection -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Device Selection</h5>
-            </div>
-            <div class="card-body">
-                <!-- Device Search -->
-                <div class="device-search">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" class="form-control" id="deviceSearch" placeholder="Search devices by name or IP...">
-                    <button type="button" class="clear-search" id="clearDeviceSearch" title="Clear search">×</button>
-                </div>
-                
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="selectAll">
-                    <label class="form-check-label" for="selectAll">
-                        <strong>Select All Devices</strong>
-                    </label>
-                </div>
-                
-                <div class="row" id="deviceList">
-                    {% for device in devices %}
-                    <div class="col-md-6 col-lg-4 mb-2 device-item" data-device-name="{{ device }}">
-                        <div class="form-check">
-                            <input class="form-check-input device-checkbox" type="checkbox" value="{{ device }}" id="device-{{ loop.index }}">
-                            <label class="form-check-label" for="device-{{ loop.index }}">
-                                {{ device }}
-                            </label>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                
-                <div class="no-devices-found" id="noDevicesFound">
-                    No devices found matching your search.
-                </div>
-                
-                <div class="device-count" id="deviceCount">
-                    Showing {{ devices|length }} of {{ devices|length }} devices
-                </div>
-            </div>
+<div class="container-fluid mt-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">🌐 Network Assistant</h1>
+        <div class="text-muted">
+          <small>Advanced Network Device Management & Configuration</small>
         </div>
+      </div>
+      <p class="text-muted mb-4">
+        Enter commands like: <code>audit R1</code>, <code>find out the health of the device</code>, 
+        <code>configure BGP on R2</code>, <code>show version</code>, etc.
+      </p>
+    </div>
+  </div>
 
-        <!-- Command Input -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Network Request</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <textarea class="form-control" id="promptText" rows="4" placeholder="Enter your network request..."></textarea>
-                </div>
-                
-                <div class="d-flex gap-2 flex-wrap">
-                    <button class="btn btn-primary" id="executeBtn">
-                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
-                        Apply Configuration
-                    </button>
-                    <button class="btn btn-info" id="verifyBtn">
-                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
-                       Verify Command
-                    </button>
-                    <button class="btn btn-success" id="backupBtn">
-                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
-                        Backup Config
-                    </button>
-                    <button class="btn btn-warning" id="restoreBtn">
-                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
-                        Restore Config
-                    </button>
-                </div>
-            </div>
+  <div class="row">
+    <div class="col-lg-4">
+      <!-- Device Selection -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">📱 Device Selection</h5>
         </div>
-
-        <!-- Backup File Selection -->
-        <div class="card mb-4" id="backupFilesCard" style="display: none;">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Backup Files</h5>
-                <button class="btn btn-sm btn-outline-primary" onclick="refreshBackupFiles()">🔄 Refresh</button>
-            </div>
-            <div class="card-body">
-                <select class="form-select mb-3" id="backupFiles" multiple size="5">
-                    <!-- Options will be populated dynamically -->
-                </select>
-                <small class="text-muted">Select backup files to restore (hold Ctrl/Cmd for multiple selection)</small>
-                
-            </div>
-        </div>
-
-        <!-- Results Area -->
-        <div id="resultsArea"></div>
-
-        <!-- Scheduled Backup -->
-        <hr class="my-5">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">📅 Schedule Backup using Date & Time</h5>
-            </div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Select Devices</label>
-                        
-                        <!-- Schedule Device Search -->
-                        <div class="device-search">
-                            <span class="search-icon">🔍</span>
-                            <input type="text" class="form-control" id="scheduleDeviceSearch" placeholder="Search devices by name or IP...">
-                            <button type="button" class="clear-search" id="clearScheduleDeviceSearch" title="Clear search">×</button>
-                        </div>
-                        
-                        <!-- Schedule Select All Checkbox -->
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="scheduleSelectAll">
-                            <label class="form-check-label" for="scheduleSelectAll">
-                                <strong>Select All Devices</strong>
-                            </label>
-                        </div>
-                        
-                        <!-- Checkboxes for devices -->
-                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
-                            <div class="row" id="scheduleDeviceList">
-                                {% for device in devices %}
-                                <div class="col-12 mb-2 device-item" data-device-name="{{ device }}">
-                                    <div class="form-check">
-                                        <input class="form-check-input schedule-device-checkbox" type="checkbox" value="{{ device }}" id="schedule-device-{{ loop.index }}">
-                                        <label class="form-check-label" for="schedule-device-{{ loop.index }}">
-                                            {{ device }}
-                                        </label>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            
-                            <div class="no-devices-found" id="noScheduleDevicesFound">
-                                No devices found matching your search.
-                            </div>
-                        </div>
-                        
-                        <div class="device-count" id="scheduleDeviceCount">
-                            Showing {{ devices|length }} of {{ devices|length }} devices
-                        </div>
-                        
-                        <!-- Hidden multi-select to maintain compatibility with existing logic -->
-                        <select class="form-select" id="scheduleDevices" multiple style="display: none;">
-                            {% for device in devices %}
-                            <option value="{{ device }}">{{ device }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="scheduleDate" class="form-label">Date</label>
-                        <input type="date" class="form-control" id="scheduleDate">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="scheduleTime" class="form-label">Time</label>
-                        <input type="time" class="form-control" id="scheduleTime" value="01:00">
-                    </div>
+        <div class="card-body">
+          <div class="device-search">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" id="deviceSearch" placeholder="Search devices by name or IP...">
+            <button type="button" class="clear-search" id="clearDeviceSearch" title="Clear search">×</button>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="selectAll">
+            <label class="form-check-label"><strong>Select All Devices</strong></label>
+          </div>
+          <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+            <div id="deviceList">
+              {% for device in devices %}
+              <div class="device-item" data-device-name="{{ device }}">
+                <div class="form-check">
+                  <input class="form-check-input device-checkbox" type="checkbox" value="{{ device }}" id="device-{{ loop.index }}">
+                  <label class="form-check-label" for="device-{{ loop.index }}">{{ device }}</label>
                 </div>
-                
-                <button class="btn btn-info" id="scheduleBtn">
-                    <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
-                    Schedule Backup
-                </button>
+              </div>
+              {% endfor %}
             </div>
+            <div class="no-devices-found" id="noDevicesFound">No devices found matching your search.</div>
+          </div>
+          <div class="device-count" id="deviceCount">Showing {{ devices|length }} of {{ devices|length }} devices</div>
         </div>
+      </div>
 
-        <!-- Toast Container -->
-        <div class="toast-container position-fixed bottom-0 end-0 p-3">
-            <div id="toast" class="toast" role="alert">
-                <div class="toast-header">
-                    <strong class="me-auto">Network Assistant</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-                </div>
-                <div class="toast-body" id="toastBody"></div>
-            </div>
+      <!-- Backup & Restore Management -->
+      <div class="card" id="backupFilesCard" style="display:none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">💾 Backup & Restore</h5>
+          <button class="btn btn-sm btn-outline-primary" onclick="refreshBackupFiles()">🔄 Refresh</button>
         </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Available Backup Files</label>
+            <select class="form-select" id="backupFiles" multiple size="5"></select>
+            <small class="text-muted">Select backup files to restore (hold Ctrl/Cmd for multiple)</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Golden Configuration</label>
+            <select id="goldenConfigSelect" class="form-select">
+              <option value="">-- Choose golden config --</option>
+            </select>
+          </div>
+
+          <div class="d-grid">
+            <button class="btn btn-warning" id="restoreBtn">
+              <span class="loading spinner-border spinner-border-sm me-2"></span> 
+              🔧 Restore Configuration
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Upload -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">📁 Configuration Upload</h5>
+        </div>
+        <div class="card-body">
+          <form id="uploadForm" enctype="multipart/form-data">
+            <div class="upload-zone mb-3">
+              <input type="file" class="form-control" id="configFile" name="config_file" accept=".cfg,.conf">
+              <div class="mt-2 text-muted">
+                <small>Upload .cfg or .conf files</small>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Configuration Type</label>
+              <select class="form-select" id="configType" name="config_type">
+                <option value="backup">Backup Configuration</option>
+                <option value="golden">Golden Configuration</option>
+              </select>
+            </div>
+            <div class="d-grid">
+              <button type="button" class="btn btn-outline-primary" id="uploadBtn">
+                <span class="loading spinner-border spinner-border-sm me-2"></span> 
+                📤 Upload Configuration
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Device search functionality
-        function setupDeviceSearch(searchInputId, deviceListId, noDevicesFoundId, deviceCountId, totalDevices) {
-            const searchInput = document.getElementById(searchInputId);
-            const deviceList = document.getElementById(deviceListId);
-            const noDevicesFound = document.getElementById(noDevicesFoundId);
-            const deviceCount = document.getElementById(deviceCountId);
-            const clearButton = searchInput.nextElementSibling;
-            
-            function filterDevices() {
-                const searchTerm = searchInput.value.toLowerCase().trim();
-                const deviceItems = deviceList.querySelectorAll('.device-item');
-                let visibleCount = 0;
-                
-                // Show/hide clear button
-                clearButton.style.display = searchTerm ? 'block' : 'none';
-                
-                deviceItems.forEach(item => {
-                    const deviceName = item.getAttribute('data-device-name').toLowerCase();
-                    const matches = deviceName.includes(searchTerm);
-                    
-                    if (matches) {
-                        item.classList.remove('hidden');
-                        
-                        // Highlight matching text
-                        const label = item.querySelector('label');
-                        const originalText = item.getAttribute('data-device-name');
-                        
-                        if (searchTerm) {
-                            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                            const highlightedText = originalText.replace(regex, '<mark>$1</mark>');
-                            label.innerHTML = highlightedText;
-                        } else {
-                            label.textContent = originalText;
-                        }
-                        
-                        visibleCount++;
-                    } else {
-                        item.classList.add('hidden');
-                    }
-                });
-                
-                // Show/hide no devices found message
-                if (visibleCount === 0 && searchTerm) {
-                    noDevicesFound.style.display = 'block';
-                } else {
-                    noDevicesFound.style.display = 'none';
-                }
-                
-                // Update device count
-                deviceCount.textContent = `Showing ${visibleCount} of ${totalDevices} devices`;
-                
-                // Update select all checkbox logic based on visible devices
-                updateSelectAllState(deviceListId);
-            }
-            
-            function clearSearch() {
-                searchInput.value = '';
-                filterDevices();
-                searchInput.focus();
-            }
-            
-            // Event listeners
-            searchInput.addEventListener('input', filterDevices);
-            searchInput.addEventListener('keyup', function(e) {
-                if (e.key === 'Escape') {
-                    clearSearch();
-                }
-            });
-            
-            clearButton.addEventListener('click', clearSearch);
-            
-            return filterDevices;
-        }
-        
-        function updateSelectAllState(deviceListId) {
-            const deviceList = document.getElementById(deviceListId);
-            const visibleCheckboxes = deviceList.querySelectorAll('.device-item:not(.hidden) input[type="checkbox"]');
-            const checkedVisibleCheckboxes = deviceList.querySelectorAll('.device-item:not(.hidden) input[type="checkbox"]:checked');
-            
-            let selectAllCheckbox;
-            if (deviceListId === 'deviceList') {
-                selectAllCheckbox = document.getElementById('selectAll');
-            } else {
-                selectAllCheckbox = document.getElementById('scheduleSelectAll');
-            }
-            
-            if (visibleCheckboxes.length === 0) {
-                selectAllCheckbox.indeterminate = false;
-                selectAllCheckbox.checked = false;
-            } else if (checkedVisibleCheckboxes.length === visibleCheckboxes.length) {
-                selectAllCheckbox.indeterminate = false;
-                selectAllCheckbox.checked = true;
-            } else if (checkedVisibleCheckboxes.length > 0) {
-                selectAllCheckbox.indeterminate = true;
-                selectAllCheckbox.checked = false;
-            } else {
-                selectAllCheckbox.indeterminate = false;
-                selectAllCheckbox.checked = false;
-            }
-        }
-        
-        // Initialize device search for main device selection
-        const totalDevices = document.querySelectorAll('#deviceList .device-item').length;
-        const filterMainDevices = setupDeviceSearch('deviceSearch', 'deviceList', 'noDevicesFound', 'deviceCount', totalDevices);
-        
-        // Initialize device search for schedule device selection
-        const filterScheduleDevices = setupDeviceSearch('scheduleDeviceSearch', 'scheduleDeviceList', 'noScheduleDevicesFound', 'scheduleDeviceCount', totalDevices);
-        
-        // Utility to check if all commands are show commands
-        function isShowOnlyPrompt(prompt) {
-            // Split by lines, remove empty, check all start with 'show'
-            const lines = prompt.split(/\n|;/).map(l => l.trim()).filter(l => l);
-            return lines.length > 0 && lines.every(l => l.toLowerCase().startsWith('show'));
-        }
+    <div class="col-lg-8">
+      <!-- Command Input & Execution -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">⚡ Network Command Center</h5>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Network Request</label>
+            <textarea class="form-control" id="promptText" rows="4" placeholder="Enter your network request..."></textarea>
+            <div class="form-text">
 
-        // Monitor prompt changes to enable/disable buttons
-        function updateCommandButtons() {
-            const prompt = document.getElementById('promptText').value.trim();
-            const executeBtn = document.getElementById('executeBtn');
-            const verifyBtn = document.getElementById('verifyBtn');
-            
-            if (isShowOnlyPrompt(prompt)) {
-                executeBtn.disabled = true;
-                verifyBtn.disabled = false;
-            } else {
-                executeBtn.disabled = false;
-                verifyBtn.disabled = false;
-            }
-        }
+          <div class="d-flex flex-wrap btn-group-custom mb-3">
+            <button class="btn btn-primary" id="executeBtn">
+              <span class="loading spinner-border spinner-border-sm me-2"></span>
+              ⚡ Apply Configuration
+            </button>
+            <button class="btn btn-info" id="verifyBtn">
+              <span class="loading spinner-border spinner-border-sm me-2"></span>
+              🔍 Verify Command
+            </button>
+            <button class="btn btn-success" id="backupBtn">
+              <span class="loading spinner-border spinner-border-sm me-2"></span>
+              💾 Backup Configs
+            </button>
+            <button class="btn btn-outline-secondary" id="generateBtn">
+              <span class="loading spinner-border spinner-border-sm me-2"></span>
+              📋 Generate Only
+            </button>
+          </div>
 
-        document.getElementById('promptText').addEventListener('input', updateCommandButtons);
-        // Initial state
-        updateCommandButtons();
-        
-        // Global variables
-        let selectedDevices = [];
-        const toast = new bootstrap.Toast(document.getElementById('toast'));
+          <!-- Command Preview Modal -->
+          <div class="modal fade" id="configApprovalModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">🔍 Approve Configuration</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-info">
+                    <strong>⚠️ Review Commands:</strong> The following commands will be applied to selected devices.
+                  </div>
+                  <div class="command-preview" id="configPreview"></div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Cancel</button>
+                  <button type="button" class="btn btn-primary" id="approveConfigBtn">✅ Apply Configuration</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        // Utility functions
-        function showToast(message, type = 'info') {
-            const toastBody = document.getElementById('toastBody');
-            toastBody.textContent = message;
-            
-            const toastElement = document.getElementById('toast');
-            toastElement.className = `toast ${type === 'error' ? 'bg-danger text-white' : type === 'success' ? 'bg-success text-white' : ''}`;
-            toast.show();
-        }
+      <!-- Results Area -->
+      <div id="resultsArea"></div>
+    </div>
+  </div>
 
-        function toggleLoading(buttonId, isLoading) {
-            const button = document.getElementById(buttonId);
-            const spinner = button.querySelector('.loading');
-            
-            if (isLoading) {
-                spinner.style.display = 'inline-block';
-                button.disabled = true;
-            } else {
-                spinner.style.display = 'none';
-                button.disabled = false;
-                // Re-apply the logic for execute button after loading
-                if (buttonId === 'executeBtn') {
-                    updateCommandButtons();
-                }
-            }
-        }
+  <!-- Schedule Backup Section -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">📅 Schedule Automated Backup</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <label class="form-label">Select Devices for Scheduled Backup</label>
+              <div class="device-search">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="form-control" id="scheduleDeviceSearch" placeholder="Search devices...">
+                <button type="button" class="clear-search" id="clearScheduleDeviceSearch" title="Clear search">×</button>
+              </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="scheduleSelectAll">
+                <label class="form-check-label"><strong>Select All Devices</strong></label>
+              </div>
+              <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                <div id="scheduleDeviceList">
+                  {% for device in devices %}
+                  <div class="device-item" data-device-name="{{ device }}">
+                    <div class="form-check">
+                      <input class="form-check-input schedule-device-checkbox" type="checkbox" value="{{ device }}" id="schedule-device-{{ loop.index }}">
+                      <label class="form-check-label" for="schedule-device-{{ loop.index }}">{{ device }}</label>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+                <div class="no-devices-found" id="noScheduleDevicesFound">No devices found matching your search.</div>
+              </div>
+              <div class="device-count" id="scheduleDeviceCount">Showing {{ devices|length }} of {{ devices|length }} devices</div>
+              <select class="form-select" id="scheduleDevices" multiple style="display:none;">
+                {% for device in devices %}
+                <option value="{{ device }}">{{ device }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="scheduleDate" class="form-label">Backup Date</label>
+                  <input type="date" id="scheduleDate" class="form-control">
+                </div>
+                <div class="col-md-6">
+                  <label for="scheduleTime" class="form-label">Backup Time</label>
+                  <input type="time" id="scheduleTime" class="form-control" value="01:00">
+                </div>
+              </div>
+              <div class="mt-3 d-grid">
+                <button class="btn btn-info btn-lg" id="scheduleBtn">
+                  <span class="loading spinner-border spinner-border-sm me-2"></span>
+                  📅 Schedule Backup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        function getSelectedDevices() {
-            const checkboxes = document.querySelectorAll('.device-checkbox:checked');
-            return Array.from(checkboxes).map(cb => cb.value);
-        }
+  <!-- Toast Notifications -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast" class="toast" role="alert">
+      <div class="toast-header">
+        <strong class="me-auto">🌐 Network Assistant</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+      </div>
+      <div class="toast-body" id="toastBody"></div>
+    </div>
+  </div>
+</div>
 
-        function updateBackupFiles() {
-            const devices = getSelectedDevices();
-            if (devices.length === 1) {
-                // Show backup files for single device
-                fetch(`/get_backup_files?device=${encodeURIComponent(devices[0])}`)
-                    .then(response => response.json())
-                    .then(files => {
-                        const select = document.getElementById('backupFiles');
-                        select.innerHTML = '';
-                        files.forEach(file => {
-                            const option = document.createElement('option');
-                            option.value = file;
-                            option.textContent = file;
-                            select.appendChild(option);
-                        });
-                        document.getElementById('backupFilesCard').style.display = files.length > 0 ? 'block' : 'none';
-                        document.getElementById('downloadArea').style.display = files.length > 0 ? 'block' : 'none';
-                    });
-            } else {
-                document.getElementById('backupFilesCard').style.display = 'none';
-            }
-        }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+<script>
+// Utility functions
+function showToast(message, type = 'info') {
+  const toastBody = document.getElementById('toastBody');
+  toastBody.textContent = message;
+  const toastEl = document.getElementById('toast');
+  toastEl.className = `toast ${type === 'error' ? 'bg-danger text-white' : type === 'success' ? 'bg-success text-white' : ''}`;
+  new bootstrap.Toast(toastEl).show();
+}
 
-        function refreshBackupFiles() {
-            updateBackupFiles();
-            showToast('Backup files refreshed', 'success');
-        }
+function toggleLoading(buttonId, isLoading) {
+  const btn = document.getElementById(buttonId);
+  const spinner = btn.querySelector('.loading');
+  if (isLoading) {
+    spinner.style.display = 'inline-block';
+    btn.disabled = true;
+  } else {
+    spinner.style.display = 'none';
+    btn.disabled = false;
+  }
+}
 
-        // Function to sync checkbox selection with hidden multi-select
-        function syncScheduleDevices() {
-            const checkboxes = document.querySelectorAll('.schedule-device-checkbox:checked');
-            const multiSelect = document.getElementById('scheduleDevices');
-            
-            // Clear all selections
-            Array.from(multiSelect.options).forEach(option => option.selected = false);
-            
-            // Select options that match checked checkboxes
-            checkboxes.forEach(checkbox => {
-                Array.from(multiSelect.options).forEach(option => {
-                    if (option.value === checkbox.value) {
-                        option.selected = true;
-                    }
-                });
-            });
-        }
-        
-        // Restore Devices
-        document.getElementById('restoreBtn').addEventListener('click', function() {
-            const devices = getSelectedDevices();
-            const files = Array.from(document.getElementById('backupFiles').selectedOptions).map(o => o.value);
-            
-            if (devices.length === 0 || files.length === 0) {
-                showToast('Please select devices and backup files', 'error');
-                return;
-            }
-            
-            toggleLoading('restoreBtn', true);
-            
-            fetch('/restore_devices', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({devices, files})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showToast(data.error, 'error');
-                } else {
-                    displayRestoreResults(data.results);
-                }
-            })
-            .catch(error => {
-                showToast('Restore failed: ' + error.message, 'error');
-            })
-            .finally(() => {
-                toggleLoading('restoreBtn', false);
-            });
+function getSelectedDevices() {
+  return Array.from(document.querySelectorAll('#deviceList .device-checkbox:checked')).map(e => e.value);
+}
+
+function isHealthCheckPrompt(prompt) {
+  const healthKeywords = [
+    'health', 'healthy', 'status check', 'audit', 'diagnostics',
+    'system check', 'device check', 'wellness', 'condition',
+    'find out the health', 'check health', 'health status'
+  ];
+  return healthKeywords.some(keyword => prompt.toLowerCase().includes(keyword));
+}
+
+function isShowOnlyPrompt(prompt) {
+  const lines = prompt.split(/\n|;/).map(l => l.trim()).filter(Boolean);
+  return lines.length > 0 && lines.every(l => 
+    l.toLowerCase().startsWith('show') || l.toLowerCase().startsWith('sh ')
+  );
+}
+
+// Device search functionality
+function setupDeviceSearch(searchId, listId, noFoundId, countId, totalDevices) {
+  const searchInput = document.getElementById(searchId);
+  const deviceList = document.getElementById(listId);
+  const noFound = document.getElementById(noFoundId);
+  const countEl = document.getElementById(countId);
+  const clearBtn = searchInput.nextElementSibling;
+
+  function filter() {
+    const query = searchInput.value.trim().toLowerCase();
+    const items = deviceList.querySelectorAll('.device-item');
+    let visibleCount = 0;
+
+    items.forEach(item => {
+      const deviceName = item.getAttribute('data-device-name').toLowerCase();
+      if (!query || deviceName.includes(query)) {
+        item.classList.remove('hidden');
+        visibleCount++;
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+
+    clearBtn.style.display = query ? 'block' : 'none';
+    noFound.style.display = (visibleCount === 0 && query) ? 'block' : 'none';
+    countEl.textContent = `Showing ${visibleCount} of ${totalDevices} devices`;
+    updateSelectAllState(listId);
+  }
+
+  function clear() {
+    searchInput.value = '';
+    filter();
+    searchInput.focus();
+  }
+
+  searchInput.addEventListener('input', filter);
+  searchInput.addEventListener('keyup', e => {
+    if (e.key === 'Escape') clear();
+  });
+  clearBtn.addEventListener('click', clear);
+  return filter;
+}
+
+function updateSelectAllState(listId) {
+  const list = document.getElementById(listId);
+  const visibleBoxes = list.querySelectorAll('.device-item:not(.hidden) input[type="checkbox"]');
+  const checkedVisible = list.querySelectorAll('.device-item:not(.hidden) input[type="checkbox"]:checked');
+  
+  let selectAllCheckbox;
+  if (listId === 'deviceList') {
+    selectAllCheckbox = document.getElementById('selectAll');
+  } else {
+    selectAllCheckbox = document.getElementById('scheduleSelectAll');
+  }
+
+  if (visibleBoxes.length === 0) {
+    selectAllCheckbox.indeterminate = false;
+    selectAllCheckbox.checked = false;
+  } else if (checkedVisible.length === visibleBoxes.length) {
+    selectAllCheckbox.indeterminate = false;
+    selectAllCheckbox.checked = true;
+  } else if (checkedVisible.length > 0) {
+    selectAllCheckbox.indeterminate = true;
+    selectAllCheckbox.checked = false;
+  } else {
+    selectAllCheckbox.indeterminate = false;
+    selectAllCheckbox.checked = false;
+  }
+}
+
+// Initialize device search
+const totalDevices = document.querySelectorAll('#deviceList .device-item').length;
+setupDeviceSearch('deviceSearch', 'deviceList', 'noDevicesFound', 'deviceCount', totalDevices);
+setupDeviceSearch('scheduleDeviceSearch', 'scheduleDeviceList', 'noScheduleDevicesFound', 'scheduleDeviceCount', totalDevices);
+
+// Select all functionality
+document.getElementById('selectAll').addEventListener('change', function() {
+  const visibleBoxes = document.querySelectorAll('#deviceList .device-item:not(.hidden) .device-checkbox');
+  visibleBoxes.forEach(checkbox => {
+    checkbox.checked = this.checked;
+  });
+  refreshBackupFiles();
+});
+
+document.querySelectorAll('#deviceList .device-checkbox').forEach(checkbox => {
+  checkbox.addEventListener('change', function() {
+    updateSelectAllState('deviceList');
+    refreshBackupFiles();
+  });
+});
+
+// Schedule device selection
+document.getElementById('scheduleSelectAll').addEventListener('change', function() {
+  const visibleBoxes = document.querySelectorAll('#scheduleDeviceList .device-item:not(.hidden) .schedule-device-checkbox');
+  visibleBoxes.forEach(checkbox => {
+    checkbox.checked = this.checked;
+  });
+  syncScheduleDevices();
+});
+
+document.querySelectorAll('#scheduleDeviceList .schedule-device-checkbox').forEach(checkbox => {
+  checkbox.addEventListener('change', function() {
+    updateSelectAllState('scheduleDeviceList');
+    syncScheduleDevices();
+  });
+});
+
+function syncScheduleDevices() {
+  const selected = Array.from(document.querySelectorAll('.schedule-device-checkbox:checked')).map(x => x.value);
+  const multiSelect = document.getElementById('scheduleDevices');
+  Array.from(multiSelect.options).forEach(option => {
+    option.selected = selected.includes(option.value);
+  });
+}
+
+// Prompt text handling
+document.getElementById('promptText').addEventListener('input', function() {
+  const prompt = this.value.trim();
+  const executeBtn = document.getElementById('executeBtn');
+  const verifyBtn = document.getElementById('verifyBtn');
+
+  if (isShowOnlyPrompt(prompt) || isHealthCheckPrompt(prompt)) {
+    executeBtn.disabled = true;
+    verifyBtn.disabled = false;
+  } else {
+    executeBtn.disabled = false;
+    verifyBtn.disabled = false;
+  }
+});
+
+// Backup file management
+function updateBackupFiles() {
+  const devices = getSelectedDevices();
+  const backupCard = document.getElementById('backupFilesCard');
+
+  if (devices.length === 1) {
+    // Load backup files
+    fetch(`/get_backup_files?device=${encodeURIComponent(devices[0])}`)
+      .then(response => response.json())
+      .then(files => {
+        const select = document.getElementById('backupFiles');
+        select.innerHTML = '';
+        files.forEach(file => {
+          const option = document.createElement('option');
+          option.value = file;
+          option.textContent = file;
+          select.appendChild(option);
         });
+        backupCard.style.display = 'block';
+      })
+      .catch(error => console.error('Error loading backup files:', error));
 
-        // Event listeners for main device selection
-        document.getElementById('selectAll').addEventListener('change', function() {
-            const visibleCheckboxes = document.querySelectorAll('#deviceList .device-item:not(.hidden) .device-checkbox');
-            visibleCheckboxes.forEach(cb => cb.checked = this.checked);
-            updateBackupFiles();
+    // Load golden configs
+    fetch(`/get_golden_configs?device=${encodeURIComponent(devices[0])}`)
+      .then(response => response.json())
+      .then(files => {
+        const goldenSelect = document.getElementById('goldenConfigSelect');
+        goldenSelect.innerHTML = '<option value="">-- Choose golden config --</option>';
+        files.forEach(file => {
+          const option = document.createElement('option');
+          option.value = file;
+          option.textContent = file;
+          goldenSelect.appendChild(option);
         });
+      })
+      .catch(error => console.error('Error loading golden configs:', error));
+  } else {
+    document.getElementById('backupFiles').innerHTML = '';
+    document.getElementById('goldenConfigSelect').innerHTML = '<option value="">-- Choose golden config --</option>';
+    backupCard.style.display = devices.length > 0 ? 'block' : 'none';
+  }
+}
 
-        document.querySelectorAll('#deviceList .device-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                updateSelectAllState('deviceList');
-                updateBackupFiles();
-            });
-        });
+function refreshBackupFiles() {
+  updateBackupFiles();
+  showToast('Backup files refreshed', 'success');
+}
 
-        // Event listeners for schedule device selection
-        document.getElementById('scheduleSelectAll').addEventListener('change', function() {
-            const visibleCheckboxes = document.querySelectorAll('#scheduleDeviceList .device-item:not(.hidden) .schedule-device-checkbox');
-            visibleCheckboxes.forEach(cb => cb.checked = this.checked);
-            syncScheduleDevices();
-        });
+// Command execution
+document.getElementById('executeBtn').addEventListener('click', function() {
+  const devices = getSelectedDevices();
+  const prompt = document.getElementById('promptText').value.trim();
 
-        document.querySelectorAll('#scheduleDeviceList .schedule-device-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                updateSelectAllState('scheduleDeviceList');
-                syncScheduleDevices();
-            });
-        });
+  if (devices.length === 0 || !prompt) {
+    showToast('Please select devices and enter a prompt', 'error');
+    return;
+  }
 
-        // Execute Command - Only for configuration commands
-        document.getElementById('executeBtn').addEventListener('click', function() {
-            const devices = getSelectedDevices();
-            const prompt = document.getElementById('promptText').value.trim();
-            
-            if (isShowOnlyPrompt(prompt)) {
-                showToast('Only verify is allowed for show commands. Please use the Verify Command button.', 'error');
-                return;
-            }
-            
-            if (devices.length === 0 || !prompt) {
-                showToast('Please select devices and enter a prompt', 'error');
-                return;
-            }
-            
-            toggleLoading('executeBtn', true);
-            
-            fetch('/execute_command', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({devices, prompt})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showToast(data.error, 'error');
-                } else {
-                    displayExecutionResults(data);
-                }
-            })
-            .catch(error => {
-                showToast('Request failed: ' + error.message, 'error');
-            })
-            .finally(() => {
-                toggleLoading('executeBtn', false);
-            });
-        });
+  if (isShowOnlyPrompt(prompt) || isHealthCheckPrompt(prompt)) {
+    showToast('Only verify is allowed for show commands and health checks', 'error');
+    return;
+  }
 
-        // Verify Command - For show commands and verification
-        document.getElementById('verifyBtn').addEventListener('click', function() {
-            const devices = getSelectedDevices();
-            const prompt = document.getElementById('promptText').value.trim();
-            
-            if (devices.length === 0 || !prompt) {
-                showToast('Please select devices and enter a prompt', 'error');
-                return;
-            }
-            
-            toggleLoading('verifyBtn', true);
-            
-            fetch('/verify_command', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({devices, prompt})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showToast(data.error, 'error');
-                } else {
-                    displayVerifyResults(data);
-                }
-            })
-            .catch(error => {
-                showToast('Request failed: ' + error.message, 'error');
-            })
-            .finally(() => {
-                toggleLoading('verifyBtn', false);
-            });
-        });
+  toggleLoading('executeBtn', true);
 
-        // Backup Devices
-        document.getElementById('backupBtn').addEventListener('click', function() {
-            const devices = getSelectedDevices();
-            
-            if (devices.length === 0) {
-                showToast('Please select devices to backup', 'error');
-                return;
-            }
-            
-            toggleLoading('backupBtn', true);
-            
-            fetch('/backup_devices', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({devices})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showToast(data.error, 'error');
-                } else {
-                    displayBackupResults(data.results);
-                    updateBackupFiles(); // Refresh backup files list
-                }
-            })
-            .catch(error => {
-                showToast('Backup failed: ' + error.message, 'error');
-            })
-            .finally(() => {
-                toggleLoading('backupBtn', false);
-            });
-        });
+  // Step 1: Generate config preview
+  fetch('/generate_config_only', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({devices, prompt})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+      return;
+    }
 
-        // Schedule Backup - KEEPING ORIGINAL LOGIC INTACT
-        document.getElementById('scheduleBtn').addEventListener('click', function() {
-            const devices = Array.from(document.getElementById('scheduleDevices').selectedOptions).map(o => o.value);
-            const date = document.getElementById('scheduleDate').value;
-            const time = document.getElementById('scheduleTime').value;
-            
-            if (devices.length === 0 || !date || !time) {
-                showToast('Please fill all schedule fields', 'error');
-                return;
-            }
-            
-            toggleLoading('scheduleBtn', true);
-            
-            fetch('/schedule_backup', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({devices, date, time})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showToast(data.error, 'error');
-                } else {
-                    showToast(data.message, 'success');
-                }
-            })
-            .catch(error => {
-                showToast('Schedule failed: ' + error.message, 'error');
-            })
-            .finally(() => {
-                toggleLoading('scheduleBtn', false);
-            });
-        });
+    // Show config preview in modal
+    document.getElementById('configPreview').textContent = (data.commands || []).join('\n');
+    const modal = new bootstrap.Modal(document.getElementById('configApprovalModal'));
+    modal.show();
 
-        // Display functions
-        function displayExecutionResults(data) {
-            let html = '<div class="card"><div class="card-header"><h5>📋 Configuration Applied</h5></div>';
-            html += '<div class="card-body">';
-            html += '<div class="command-output">' + data.commands.join('\n') + '</div>';
-            html += '</div></div>';
-            
-            data.device_results.forEach(result => {
-                html += '<div class="device-result">';
-                html += `<h6>${result.success ? '✅' : '❌'} DEVICE: ${result.device}</h6>`;
-                
-                if (result.message) {
-                    html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">${result.message}</div>`;
-                }
-                
-                result.command_outputs.forEach(output => {
-                    html += `<h6>Command: ${output.command}</h6>`;
-                    html += `<div class="command-output">${output.output}</div>`;
-                });
-                
-                if (result.config_diff) {
-                    html += '<h6>🆚 Changes in Configuration:</h6>';
-                    html += `<div class="config-diff">${result.config_diff}</div>`;
-                }
-                
-                html += '</div>';
-            });
-            
-            document.getElementById('resultsArea').innerHTML = html;
+    // Step 2: Handle approval
+    document.getElementById('approveConfigBtn').onclick = function() {
+      modal.hide();
+      toggleLoading('executeBtn', true);
+
+      fetch('/execute_command', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({devices, prompt})
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          showToast(data.error, 'error');
+        } else {
+          displayExecutionResults(data);
         }
+      })
+      .catch(error => showToast('Request failed: ' + error.message, 'error'))
+      .finally(() => toggleLoading('executeBtn', false));
+    };
+  })
+  .catch(error => showToast('Request failed: ' + error.message, 'error'))
+  .finally(() => toggleLoading('executeBtn', false));
+});
 
-        function displayVerifyResults(data) {
-            let html = '<div class="card"><div class="card-header"><h5>🔍 Verification Results</h5></div>';
-            html += '<div class="card-body">';
-            html += '<div class="command-output">' + data.commands.join('\n') + '</div>';
-            html += '</div></div>';
-            
-            data.device_results.forEach(result => {
-                html += '<div class="device-result">';
-                html += `<h6>${result.success ? '✅' : '❌'} DEVICE: ${result.device}</h6>`;
-                
-                if (result.message) {
-                    html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">${result.message}</div>`;
-                }
-                
-                result.command_outputs.forEach(output => {
-                    html += `<h6>Command: ${output.command}</h6>`;
-                    html += `<div class="command-output">${output.output}</div>`;
-                });
-                
-                html += '</div>';
-            });
-            
-            document.getElementById('resultsArea').innerHTML = html;
+// Verify command
+document.getElementById('verifyBtn').addEventListener('click', function() {
+  const devices = getSelectedDevices();
+  const prompt = document.getElementById('promptText').value.trim();
+
+  if (devices.length === 0 || !prompt) {
+    showToast('Please select devices and enter a prompt', 'error');
+    return;
+  }
+
+  toggleLoading('verifyBtn', true);
+
+  fetch('/verify_command', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({devices, prompt})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+      return;
+    }
+
+    if (data.is_health_check) {
+      displayHealthCheckResults(data);
+    } else {
+      displayVerifyResults(data);
+    }
+  })
+  .catch(error => showToast('Request failed: ' + error.message, 'error'))
+  .finally(() => toggleLoading('verifyBtn', false));
+});
+
+// Generate only
+document.getElementById('generateBtn').addEventListener('click', function() {
+  const devices = getSelectedDevices();
+  const prompt = document.getElementById('promptText').value.trim();
+
+  if (devices.length === 0 || !prompt) {
+    showToast('Please select devices and enter a prompt', 'error');
+    return;
+  }
+
+  toggleLoading('generateBtn', true);
+
+  fetch('/generate_config_only', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({devices, prompt})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      displayGeneratedCommands(data);
+    }
+  })
+  .catch(error => showToast('Request failed: ' + error.message, 'error'))
+  .finally(() => toggleLoading('generateBtn', false));
+});
+
+// Backup configuration
+
+document.getElementById('backupBtn').addEventListener('click', function() {
+  const devices = getSelectedDevices();
+
+  if (devices.length === 0) {
+    showToast('Please select devices to backup', 'error');
+    return;
+  }
+
+  toggleLoading('backupBtn', true);
+
+  fetch('/backup_devices', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({devices})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      displayBackupResults(data.results);
+      updateBackupFiles();
+
+      // Trigger downloads for each backup
+      data.results.forEach(item => {
+        if (item.success && item.download_url) {
+          const a = document.createElement('a');
+          a.href = item.download_url;
+          a.download = ''; // let browser use default filename
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
         }
+      });
+    }
+  })
+  .catch(error => showToast('Backup failed: ' + error.message, 'error'))
+  .finally(() => toggleLoading('backupBtn', false));
+});
 
-        function displayBackupResults(results) {
-            let html = '<div class="card"><div class="card-header"><h5>💾 Backup Results</h5></div><div class="card-body">';
-            
-            results.forEach(result => {
-                html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">`;
-                html += `<strong>${result.device}:</strong> ${result.message}`;
-                html += '</div>';
-            });
-            
-            html += '</div></div>';
-            document.getElementById('resultsArea').innerHTML = html;
-        }
 
-        function displayRestoreResults(results) {
-            let html = '<div class="card"><div class="card-header"><h5>🔧 Restore Results</h5></div><div class="card-body">';
-            
-            results.forEach(result => {
-                html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">`;
-                html += `<strong>${result.device}:</strong> `;
-                
-                if (result.success && result.messages) {
-                    html += result.messages.join('<br>');
-                } else if (result.message) {
-                    html += result.message;
-                }
-                
-                html += '</div>';
-            });
-            
-            html += '</div></div>';
-            document.getElementById('resultsArea').innerHTML = html;
-        }
+// Restore configuration
+document.getElementById('restoreBtn').addEventListener('click', function() {
+  const devices = getSelectedDevices();
 
-        // Set today's date as default
-        document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
-    </script>
+  if (devices.length === 0) {
+    showToast('Please select devices to restore', 'error');
+    return;
+  }
+
+  const backupFiles = Array.from(document.getElementById('backupFiles').selectedOptions).map(o => o.value);
+  const goldenConfig = document.getElementById('goldenConfigSelect').value;
+
+  let restoreType = '';
+  let selectedFiles = [];
+
+  if (backupFiles.length > 0) {
+    restoreType = 'backup';
+    selectedFiles = backupFiles;
+  } else if (goldenConfig) {
+    restoreType = 'golden';
+    selectedFiles = [goldenConfig];
+  } else {
+    showToast('Please select backup files OR a golden config', 'error');
+    return;
+  }
+
+  toggleLoading('restoreBtn', true);
+
+  fetch('/restore_devices', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      devices: devices,
+      files: selectedFiles,
+      restore_type: restoreType
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      displayRestoreResults(data.results);
+    }
+  })
+  .catch(error => showToast('Restore failed: ' + error.message, 'error'))
+  .finally(() => toggleLoading('restoreBtn', false));
+});
+
+// Upload configuration
+document.getElementById('uploadBtn').addEventListener('click', function() {
+  const fileInput = document.getElementById('configFile');
+  const configType = document.getElementById('configType').value;
+
+  if (!fileInput.files[0]) {
+    showToast('Please select a file to upload', 'error');
+    return;
+  }
+
+  toggleLoading('uploadBtn', true);
+
+  const formData = new FormData();
+  formData.append('config_file', fileInput.files[0]);
+  formData.append('config_type', configType);
+
+  fetch('/upload_config', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast(data.message, 'success');
+      fileInput.value = '';
+      updateBackupFiles();
+    }
+  })
+  .catch(error => showToast('Upload failed: ' + error.message, 'error'))
+  .finally(() => toggleLoading('uploadBtn', false));
+});
+
+// Schedule backup
+document.getElementById('scheduleBtn').addEventListener('click', function() {
+  const devices = Array.from(document.getElementById('scheduleDevices').selectedOptions).map(o => o.value);
+  const date = document.getElementById('scheduleDate').value;
+  const time = document.getElementById('scheduleTime').value;
+
+  if (devices.length === 0 || !date || !time) {
+    showToast('Please fill all schedule fields', 'error');
+    return;
+  }
+
+  toggleLoading('scheduleBtn', true);
+
+  fetch('/schedule_backup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({devices, date, time})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast(data.message, 'success');
+    }
+  })
+  .catch(error => showToast('Schedule failed: ' + error.message, 'error'))
+  .finally(() => toggleLoading('scheduleBtn', false));
+});
+
+// Display functions
+function displayGeneratedCommands(data) {
+  let html = '<div class="card"><div class="card-header"><h5>📋 Generated Commands</h5></div><div class="card-body">';
+  html += '<div class="alert alert-info"><strong>📝 Preview:</strong> Commands generated but not executed</div>';
+  html += '<div class="command-output">' + (data.commands || []).join('\n') + '</div>';
+  html += '</div></div>';
+  document.getElementById('resultsArea').innerHTML = html;
+}
+
+function displayExecutionResults(data) {
+  let html = '<div class="card"><div class="card-header"><h5>⚡ Configuration Applied</h5></div><div class="card-body">';
+  html += '<div class="alert alert-success"><strong>✅ Applied:</strong> Configuration has been applied to selected devices</div>';
+  html += '<div class="command-output">' + (data.commands || []).join('\n') + '</div>';
+  html += '</div></div>';
+
+  (data.device_results || []).forEach(result => {
+    html += '<div class="device-result">';
+    html += `<h6>${result.success ? '✅' : '❌'} DEVICE: ${result.device}</h6>`;
+    
+    if (result.message) {
+      html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">${result.message}</div>`;
+    }
+
+    (result.command_outputs || []).forEach(output => {
+      html += `<h6>Command: <code>${output.command}</code></h6>`;
+      html += `<div class="command-output">${output.output}</div>`;
+    });
+
+    if (result.config_diff) {
+      html += '<h6>🆚 Configuration Changes:</h6>';
+      html += `<div class="config-diff">${result.config_diff}</div>`;
+    }
+
+    html += '</div>';
+  });
+
+  document.getElementById('resultsArea').innerHTML = html;
+}
+
+function displayVerifyResults(data) {
+  let html = '<div class="card"><div class="card-header"><h5>🔍 Verification Results</h5></div><div class="card-body">';
+  html += '<div class="alert alert-info"><strong>🔍 Verified:</strong> Commands verified without execution</div>';
+  html += '<div class="command-output">' + (data.commands || []).join('\n') + '</div>';
+  html += '</div></div>';
+
+  (data.device_results || []).forEach(result => {
+    html += '<div class="device-result">';
+    html += `<h6>${result.success ? '✅' : '❌'} DEVICE: ${result.device}</h6>`;
+    
+    if (result.message) {
+      html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">${result.message}</div>`;
+    }
+
+    (result.command_outputs || []).forEach(output => {
+      html += `<h6>Command: <code>${output.command}</code></h6>`;
+      html += `<div class="command-output">${output.output}</div>`;
+    });
+
+    html += '</div>';
+  });
+
+  document.getElementById('resultsArea').innerHTML = html;
+}
+
+function displayHealthCheckResults(data) {
+  let html = '<div class="card"><div class="card-header"><h5>🏥 Device Health Check Results</h5></div><div class="card-body">';
+  html += '<div class="alert alert-info"><strong>🔍 Health Audit:</strong> Comprehensive device health analysis completed</div>';
+  html += '<div class="mb-3"><strong>Health Check Commands:</strong></div>';
+  html += '<div class="command-output mb-3">' + (data.commands || []).join('\n') + '</div>';
+  html += '</div></div>';
+
+  (data.device_results || []).forEach(result => {
+    let deviceClass = 'device-result';
+    let statusIcon = '❌';
+    let summaryClass = 'critical';
+
+    if (result.health_status) {
+      if (result.health_status.overall_healthy && result.health_status.warnings.length === 0) {
+        deviceClass += ' healthy';
+        statusIcon = '✅';
+        summaryClass = 'healthy';
+      } else if (result.health_status.overall_healthy && result.health_status.warnings.length > 0) {
+        deviceClass += ' warning';
+        statusIcon = '⚠️';
+        summaryClass = 'warning';
+      } else {
+        deviceClass += ' critical';
+        statusIcon = '❌';
+        summaryClass = 'critical';
+      }
+    }
+
+    html += `<div class="${deviceClass}">`;
+    html += `<h6>${statusIcon} DEVICE: ${result.device} <span class="status-badge status-${summaryClass}">${summaryClass.toUpperCase()}</span></h6>`;
+
+    if (result.health_status) {
+      // Health Summary
+      html += `<div class="health-summary ${summaryClass}">${result.health_status.summary}</div>`;
+
+      // Critical Issues
+      if (result.health_status.issues.length > 0) {
+        html += '<div class="health-issues">';
+        html += '<strong class="text-danger">🚨 Critical Issues:</strong>';
+        html += '<ul>';
+        result.health_status.issues.forEach(issue => {
+          html += `<li class="text-danger">${issue}</li>`;
+        });
+        html += '</ul></div>';
+      }
+
+      // Warnings
+      if (result.health_status.warnings.length > 0) {
+        html += '<div class="health-warnings">';
+        html += '<strong class="text-warning">⚠️ Warnings:</strong>';
+        html += '<ul>';
+        result.health_status.warnings.forEach(warning => {
+          html += `<li class="text-warning">${warning}</li>`;
+        });
+        html += '</ul></div>';
+      }
+    }
+
+    if (result.message && !result.health_status) {
+      html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">${result.message}</div>`;
+    }
+
+    // Collapsible detailed output
+    if (result.command_outputs && result.command_outputs.length > 0) {
+      html += '<div class="collapsible-section">';
+      html += '<div class="collapsible-header" onclick="toggleCollapsible(this)">';
+      html += '<strong>📊 Detailed Command Outputs</strong> <span class="float-end">▼</span>';
+      html += '</div>';
+      html += '<div class="collapsible-content">';
+
+      result.command_outputs.forEach(output => {
+        html += '<div class="mt-3">';
+        html += `<h6>Command: <code>${output.command}</code></h6>`;
+        html += `<div class="health-output">${output.output}</div>`;
+        html += '</div>';
+      });
+
+      html += '</div></div>';
+    }
+
+    html += '</div>';
+  });
+
+  document.getElementById('resultsArea').innerHTML = html;
+}
+
+function displayBackupResults(results) {
+  let html = '<div class="card"><div class="card-header"><h5>💾 Backup Results</h5></div><div class="card-body">';
+  
+  results.forEach(result => {
+    html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">`;
+    html += `<strong>${result.device}:</strong> ${result.message}`;
+    html += '</div>';
+  });
+
+  html += '</div></div>';
+  document.getElementById('resultsArea').innerHTML = html;
+}
+
+function displayRestoreResults(results) {
+  let html = '<div class="card"><div class="card-header"><h5>🔧 Restore Results</h5></div><div class="card-body">';
+  
+  results.forEach(result => {
+    html += `<div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">`;
+    html += `<strong>${result.device}:</strong><br/>`;
+    
+    if (result.success && result.messages) {
+      html += result.messages.map(message => 
+        `<pre style="white-space: pre-wrap; margin: 5px 0;">${message}</pre>`
+      ).join('<hr style="margin: 10px 0;"/>');
+    } else if (result.message) {
+      html += result.message;
+    }
+    
+    html += '</div>';
+  });
+
+  html += '</div></div>';
+  document.getElementById('resultsArea').innerHTML = html;
+}
+
+function toggleCollapsible(element) {
+  const content = element.nextElementSibling;
+  const arrow = element.querySelector('span');
+
+  if (content.classList.contains('show')) {
+    content.classList.remove('show');
+    arrow.textContent = '▼';
+  } else {
+    content.classList.add('show');
+    arrow.textContent = '▲';
+  }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  // Set default schedule date to today
+  document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
+  
+  // Update backup files when page loads
+  updateBackupFiles();
+});
+</script>
 </body>
 </html>
