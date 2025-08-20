@@ -15,6 +15,7 @@ import json
 import paramiko  # For SFTP to remote Ubuntu
 from utils.cohere_parser import get_action_from_prompt, extract_config_commands
 import re
+from flask import send_from_directory, abort
 
 # ==== Remote Ubuntu backup details (Change these) ====
 CLIENT_USER = "vayu2"
@@ -614,12 +615,21 @@ def schedule_backup():
         logging.error(f"Failed to schedule backup: {e}")
         return jsonify({'error': f'Failed to schedule backup: {str(e)}'}), 500
 
-@app.route('/download_backup/<device_name>/<filename>')
+@app.route('/download_backup/<device_name>/<path:filename>')
 def download_backup(device_name, filename):
     """Download a specific backup file"""
     try:
         backup_dir = os.path.join(RUNNING_CONFIG_FOLDER, device_name)
-        return send_from_directory(backup_dir, filename, as_attachment=True)
+
+        if not os.path.exists(os.path.join(backup_dir, filename)):
+            return abort(404, description="Backup file not found")
+
+        return send_from_directory(
+            backup_dir,
+            filename,
+            as_attachment=True,
+            download_name=filename  # ✅ ensures filename is preserved
+        )
     except Exception as e:
         logging.error(f"Download failed for {device_name}/{filename}: {e}")
         return "Error downloading file", 500
