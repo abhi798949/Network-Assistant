@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-# flask_code2.py
-# Full Flask app with per-device folders for running/backups/current/golden and generate_config_only route
-# Enhanced with better XR device handling and pattern detection fixes
-# Added Golden Config feature - mark backups as golden and dedicated golden restore
-
 import os
 import re
 import json
