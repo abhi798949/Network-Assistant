@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,12 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Network Configuration Manager</title>
 
-  <!-- Bootstrap CSS -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
   <style>
-    /* ... (keeping all your existing CSS) ... */
     :root {
       --accent: #4a90e2;
       --bg-from: #667eea;
@@ -36,6 +33,7 @@
     .file-list { max-height: 240px; overflow:auto; border-radius:6px; border:1px solid #eef2f6; background:#fff; padding:8px; }
     .panel { display:none; }
     .panel.active { display:block; }
+    
     .results-area { max-height: 420px; overflow:auto; margin-top:12px; }
     .device-card { margin-bottom: 10px; }
     .status-success { background:#e6ffed; border-left:5px solid #28a745; padding:8px; border-radius:4px; }
@@ -100,12 +98,126 @@
       margin-right: 4px;
     }
     
+    /* Visibility rules (updated for new Backup/Restore UX) */
+    .panel.active#executePanel ~ .center-col .files-section,
+    .panel.active#verifyPanel ~ .center-col .files-section,
+    .panel.active#schedulePanel ~ .center-col .files-section,
+    .panel.active#backupPanel ~ .center-col .files-section {
+      display: none !important;
+    }
+    .panel.active#uploadPanel ~ .center-col .devices-section,
+    .panel.active#uploadPanel ~ .center-col .files-section {
+      display: none !important;
+    }
+    
     /* responsive */
     @media (max-width: 992px) {
       .sidebar { order: 2; }
       .center-col { order: 1; }
       .right-col { order: 3; }
     }
+
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      margin: -20px 0 0 -20px; /* center the spinner */
+      z-index: 9999;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .small-spinner {
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      border-left-color: #3498db;
+      border-radius: 50%;
+      display: inline-block;
+      vertical-align: middle;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      margin-left: 8px;
+    }
+
+    /* TIG Monitoring styles */
+    .tig-container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .tig-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .tig-status:last-child {
+      border-bottom: none;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .status-running { background-color: #28a745; }
+    .status-stopped { background-color: #dc3545; }
+    .status-unknown { background-color: #6c757d; }
+
+    .grafana-embed {
+      width: 100%;
+      height: 400px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin-top: 15px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .metric-card {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4a90e2;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 5px;
+    }
+
+    /* legacy left shift from earlier request (kept as-is) */
+    #uploadPanel { margin-left: -400px; }
+
   </style>
 </head>
 <body>
@@ -115,27 +227,34 @@
         <div class="logo">NCM</div>
         <div><strong>Network Configuration Manager</strong></div>
       </div>
-      <div class="small-muted">Ready</div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="small-muted">👤 {{ user }}</div>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">Logout</a>
+      </div>
     </div>
 
     <div class="content container-fluid">
       <div class="row gx-3">
-        <!-- LEFT: Features sidebar -->
         <div class="col-lg-2 sidebar">
           <h6 class="mb-2">Features</h6>
           <div class="list-group">
-            <button class="list-group-item list-group-item-action active" data-target="executePanel"><i class="fas fa-play me-2"></i> Apply Configuration</button>
-            <button class="list-group-item list-group-item-action" data-target="verifyPanel"><i class="fas fa-check-circle me-2"></i> Verify commands</button>
+            <button class="list-group-item list-group-item-action active" data-target="executePanel"><i class="fas fa-play me-2"></i> Execute Command</button>
+            <button class="list-group-item list-group-item-action" data-target="verifyPanel"><i class="fas fa-check-circle me-2"></i> Verify Command</button>
             <button class="list-group-item list-group-item-action" data-target="backupPanel"><i class="fas fa-download me-2"></i> Backup Config</button>
             <button class="list-group-item list-group-item-action" data-target="restorePanel"><i class="fas fa-upload me-2"></i> Restore Config</button>
             <button class="list-group-item list-group-item-action" data-target="schedulePanel"><i class="fas fa-clock me-2"></i> Schedule Config</button>
-            <button class="list-group-item list-group-item-action" data-target="uploadPanel"><i class="fas fa-file-upload me-2"></i> Upload Config</button>
+            <button class="list-group-item list-group-item-action" data-target="monitorPanel">
+              <i class="fas fa-desktop me-2"></i> Monitoring
+            </button>
+            <button class="list-group-item list-group-item-action" data-target="tigPanel">
+              <i class="fas fa-chart-area me-2"></i> TIG Monitoring
+            </button>
           </div>
         </div>
 
-        <!-- CENTER: Devices and file list -->
         <div class="col-lg-4 center-col">
-          <div class="card mb-3">
+          <!-- Devices -->
+          <div class="card mb-3 devices-section">
             <div class="card-header">Devices</div>
             <div class="card-body">
               <div class="form-check mb-1">
@@ -161,110 +280,112 @@
             </div>
           </div>
 
-          <div class="card">
+          <!-- Files -->
+          <div class="card files-section">
             <div class="card-header d-flex justify-content-between align-items-center">
               <span>Files (Backup / Golden)</span>
               <div class="btn-group btn-group-sm" role="group">
                 <input type="radio" class="btn-check" name="fileMode" id="modeAll" value="all" checked autocomplete="off">
                 <label class="btn btn-outline-primary btn-sm" for="modeAll">All</label>
-                
+
                 <input type="radio" class="btn-check" name="fileMode" id="modeBackup" value="backup" autocomplete="off">
                 <label class="btn btn-outline-primary btn-sm" for="modeBackup">Backup</label>
-                
+
                 <input type="radio" class="btn-check" name="fileMode" id="modeGolden" value="golden" autocomplete="off">
                 <label class="btn btn-outline-warning btn-sm" for="modeGolden"><i class="fas fa-star"></i> Golden</label>
               </div>
             </div>
             <div class="card-body">
-              <div class="mb-2 small-muted">Choose a device and file mode to load files</div>
-              <select id="fileDeviceSelect" class="form-select form-select-sm mb-2">
-                <option value="">-- Select device --</option>
-                {% for device in devices %}
-                <option value="{{ device }}">{{ device }}</option>
-                {% endfor %}
-              </select>
+              <div class="mb-2 small-muted">Select a device from the Devices list to load files.</div>
 
-              <div id="fileList" class="file-list small-muted">Select a device and file mode to view files</div>
+              <div id="fileList" class="file-list small-muted">Waiting for device selection…</div>
               
-              <!-- Download All Button -->
               <button id="downloadAllBtn" class="btn download-all-btn btn-sm w-100" style="display: none;">
                 <i class="fas fa-download"></i> Download All Files for Device
               </button>
               
               <div class="small-muted mt-2">
-                <i class="fas fa-star golden-star"></i>Golden configs are marked backups for restore purposes.
+                <i class="fas fa-star golden-star"></i> Golden configs are marked backups for restore purposes.
               </div>
             </div>
           </div>
         </div>
 
-        <!-- RIGHT: Workspace / Panels (keeping all your existing panels) -->
         <div class="col-lg-6 right-col">
-          <!-- Execute panel -->
           <div id="executePanel" class="panel active">
             <div class="card mb-3">
-              <div class="card-header">Execute — generate & apply</div>
+              <div class="card-header">Execute Command — generate & apply</div>
               <div class="card-body">
                 <div class="mb-2">
                   <textarea id="promptText" class="form-control" rows="4" placeholder="Describe config or paste commands"></textarea>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                   <button id="generateBtn" class="btn btn-outline-primary action-btn"><i class="fas fa-eye"></i> Preview</button>
-                  <button id="executeBtn" class="btn btn-primary action-btn"><i class="fas fa-play"></i> Apply</button>
+                  <button id="executeBtn" class="btn btn-primary action-btn"><i class="fas fa-play"></i> Apply <span id="executeSpinner" class="small-spinner" style="display: none;"></span></button>
+                  <button id="execDownloadPdfBtn" class="btn btn-outline-secondary action-btn" style="display:none;">
+                    <i class="fas fa-file-pdf"></i> Download Summary (PDF)
+                  </button>
                 </div>
                 <div class="results-area mt-3" id="execResults"></div>
               </div>
             </div>
           </div>
 
-          <!-- Verify panel -->
           <div id="verifyPanel" class="panel">
             <div class="card mb-3">
-              <div class="card-header">Verify — run show/verify commands</div>
+              <div class="card-header">Verify / Run As-Is</div>
               <div class="card-body">
-                <div class="mb-2 small-muted">Enter verify prompt or use the same prompt from Execute.</div>
-                <textarea id="verifyPrompt" class="form-control mb-2" rows="3" placeholder="Enter verification command(s)"></textarea>
+                <div class="mb-2 small-muted">Enter verify prompt or raw commands.</div>
+                <textarea id="verifyPrompt" class="form-control mb-2" rows="3" placeholder="Enter verification or raw command(s)"></textarea>
+                
                 <div class="d-flex gap-2">
-                  <button id="verifyBtn" class="btn btn-success action-btn"><i class="fas fa-play"></i> Run Verify</button>
+                  <button id="verifyBtn" class="btn btn-success action-btn">
+                    <i class="fas fa-robot me-1"></i> Run verification through AI
+                    <span id="verifySpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+
+                  <button id="runAsisBtn" class="btn btn-primary action-btn">
+                    <i class="fas fa-terminal me-1"></i> Run Command as-is
+                    <span id="asisSpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+                  <button id="verifyDownloadPdfBtn" class="btn btn-outline-secondary action-btn" style="display:none;">
+                    <i class="fas fa-file-pdf"></i> Download Summary (PDF)
+                  </button>
                 </div>
                 <div class="results-area mt-3" id="verifyResults"></div>
               </div>
             </div>
           </div>
 
-          <!-- Backup panel -->
           <div id="backupPanel" class="panel">
             <div class="card mb-3">
               <div class="card-header">Backup — take running-config</div>
               <div class="card-body">
-                <div class="small-muted mb-2">Select devices on the left and press Backup. Files saved under per-device folders.</div>
+                <div class="small-muted mb-2">Select devices on the left. Files panel is hidden for Backup.</div>
                 <div class="d-flex gap-2">
-                  <button id="backupBtn" class="btn btn-warning action-btn"><i class="fas fa-download"></i> Backup Selected</button>
+                  <button id="backupBtn" class="btn btn-warning action-btn"><i class="fas fa-download"></i> Backup <span id="backupSpinner" class="small-spinner" style="display: none;"></span></button>
                 </div>
                 <div class="results-area mt-3" id="backupResults"></div>
               </div>
             </div>
           </div>
 
-          <!-- Restore panel -->
           <div id="restorePanel" class="panel">
             <div class="card mb-3">
-              <div class="card-header">Restore — choose files & restore</div>
+              <div class="card-header">Restore</div>
               <div class="card-body">
-                <div class="mb-2">
-                  <label class="form-check-label me-3"><input type="radio" name="restoreType" value="backup" checked> Backup Files</label>
-                  <label class="form-check-label"><input type="radio" name="restoreType" value="golden"> <i class="fas fa-star golden-star"></i>Golden Configs</label>
-                </div>
-                <div class="small-muted mb-2">Pick files from left panel, select devices, then click Restore Selected.</div>
+                <div class="small-muted mb-2">Select a device to load its files, tick files in the Files panel, then click Restore.</div>
                 <div class="d-flex gap-2">
-                  <button id="prepareRestoreBtn" class="btn btn-info action-btn"><i class="fas fa-upload"></i> Prepare Restore</button>
+                  <button id="restoreBtn" class="btn btn-primary action-btn">
+                    <i class="fas fa-upload"></i> Restore
+                    <span id="restoreSpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
                 </div>
                 <div class="results-area mt-3" id="restoreResults"></div>
               </div>
             </div>
           </div>
 
-          <!-- Schedule panel -->
           <div id="schedulePanel" class="panel">
             <div class="card mb-3">
               <div class="card-header">Schedule Backup</div>
@@ -272,7 +393,7 @@
                 <div class="row g-2 align-items-center">
                   <div class="col-auto"><input type="date" id="scheduleDate" class="form-control"></div>
                   <div class="col-auto"><input type="time" id="scheduleTime" class="form-control"></div>
-                  <div class="col-auto"><button id="scheduleBtn" class="btn btn-secondary action-btn"><i class="fas fa-calendar-plus"></i> Schedule</button></div>
+                  <div class="col-auto"><button id="scheduleBtn" class="btn btn-secondary action-btn"><i class="fas fa-calendar-plus"></i> Schedule <span id="scheduleSpinner" class="small-spinner" style="display: none;"></span></button></div>
                 </div>
                 <div class="small-muted mt-2">Scheduler runs in Flask background thread — ensure server is running.</div>
                 <div class="results-area mt-3" id="schedResults"></div>
@@ -280,34 +401,131 @@
             </div>
           </div>
 
-          <!-- Upload panel -->
-          <div id="uploadPanel" class="panel">
+          <div id="monitorPanel" class="panel">
             <div class="card mb-3">
-              <div class="card-header">Upload Config</div>
+              <div class="card-header">Monitoring</div>
               <div class="card-body">
-                <div class="mb-2">
-                  <input type="file" id="uploadInput" class="form-control">
+                <div class="small-muted mb-2">
+                  Select one or more devices on the left, then choose an action below.
                 </div>
-                <div class="mb-2">
-                  <select id="uploadType" class="form-select form-select-sm">
-                    <option value="backup">Upload as Backup</option>
-                    <option value="golden">Upload as Golden Config</option>
-                  </select>
+                <div class="d-flex gap-2 mb-3">
+                  <button id="healthBtn" class="btn btn-success action-btn">
+                    <i class="fas fa-heartbeat"></i> Check Health
+                    <span id="healthSpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+                  <button id="connectivityBtn" class="btn btn-info action-btn">
+                    <i class="fas fa-wifi"></i> Quick Ping
+                    <span id="connectivitySpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
                 </div>
-                <div class="d-flex gap-2">
-                  <button id="uploadBtn" class="btn btn-dark action-btn"><i class="fas fa-upload"></i> Upload</button>
-                </div>
-                <div class="results-area mt-3" id="uploadResults"></div>
+                <div id="monitorResults" class="results-area"></div>
               </div>
             </div>
           </div>
 
-        </div> <!-- right-col -->
-      </div> <!-- row -->
-    </div> <!-- content -->
-  </div> <!-- frame -->
+          <div id="tigPanel" class="panel">
+            <div class="card mb-3">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <span>TIG Stack Monitoring</span>
+                <div class="btn-group btn-group-sm">
+                  <button id="tigStatusBtn" class="btn btn-outline-info btn-sm">
+                    <i class="fas fa-heartbeat"></i> Check Status
+                    <span id="tigStatusSpinner" class="small-spinner" style="display: none;"></span>
+                  </button>
+                  <button id="tigConfigBtn" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-cog"></i> Configure
+                  </button>
+                </div>
+              </div>
+              
+              <div class="card-body">
+                <!-- TIG Status Section -->
+                <div id="tigStatusContainer" class="tig-container">
+                  <h6>Service Status</h6>
+                  <div id="tigServices">
+                    <div class="tig-status">
+                      <span><i class="fas fa-database"></i> InfluxDB</span>
+                      <span id="influxStatus">
+                        <span class="status-indicator status-unknown"></span>
+                        Checking...
+                      </span>
+                    </div>
+                    <div class="tig-status">
+                      <span><i class="fas fa-chart-line"></i> Grafana</span>
+                      <span id="grafanaStatus">
+                        <span class="status-indicator status-unknown"></span>
+                        Checking...
+                      </span>
+                    </div>
+                    <div class="tig-status">
+                      <span><i class="fas fa-plug"></i> Telegraf</span>
+                      <span id="telegrafStatus">
+                        <span class="status-indicator status-unknown"></span>
+                        Checking...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+          
+                <!-- Device Metrics Section -->
+                <div id="tigMetricsContainer" class="tig-container" style="display: none;">
+                  <h6>Device Metrics Overview</h6>
+                  <div id="metricsGrid" class="metrics-grid"></div>
+                </div>
+          
+                <!-- Grafana Embed Section -->
+                <div id="grafanaContainer" class="tig-container" style="display: none;">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6>Grafana Dashboard</h6>
+                    <a id="grafanaLink" href="#" target="_blank" class="btn btn-sm btn-outline-primary">
+                      <i class="fas fa-external-link-alt"></i> Open Full Dashboard
+                    </a>
+                  </div>
+                  <iframe id="grafanaEmbed" class="grafana-embed" src=""></iframe>
+                </div>
+          
+                <!-- Configuration Section -->
+                <div id="tigConfigContainer" class="tig-container" style="display: none;">
+                  <h6>TIG Configuration</h6>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label">InfluxDB URL</label>
+                      <input type="text" id="influxUrl" class="form-control form-control-sm" 
+                             placeholder="http://localhost:8086" value="http://localhost:8086">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Grafana URL</label>
+                      <input type="text" id="grafanaUrl" class="form-control form-control-sm" 
+                             placeholder="http://localhost:3000" value="http://localhost:3000">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Collection Interval (sec)</label>
+                      <input type="number" id="collectionInterval" class="form-control form-control-sm" 
+                             value="30" min="10" max="300">
+                    </div>
+                  </div>
+                  <div class="mt-3">
+                    <button id="tigSaveConfigBtn" class="btn btn-primary btn-sm">
+                      <i class="fas fa-save"></i> Save Configuration
+                    </button>
+                    <button id="tigStartBtn" class="btn btn-success btn-sm ms-2">
+                      <i class="fas fa-play"></i> Start Collection
+                    </button>
+                    <button id="tigStopBtn" class="btn btn-danger btn-sm ms-2">
+                      <i class="fas fa-stop"></i> Stop Collection
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-  <!-- Preview modal (editable) -->
+        </div><!-- /.right-col -->
+      </div><!-- /.row -->
+    </div><!-- /.content -->
+  </div><!-- /.app-frame -->
+
+  <!-- Preview Modal -->
   <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
@@ -322,31 +540,87 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button id="applyFromPreviewBtn" class="btn btn-primary">Apply</button>
+          <button id="applyFromPreviewBtn" class="btn btn-primary">Apply <span id="applyPreviewSpinner" class="small-spinner" style="display: none;"></span></button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Bootstrap JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
 
   <script>
-    async function loadBackupFiles(deviceLabel){
+    // Lightweight DOM helpers
+    const qs = (sel, ctx=document) => ctx.querySelector(sel);
+    const qsa = (sel, ctx=document) => Array.from((ctx || document).querySelectorAll(sel));
+
+    // Simple escape for HTML shown in UI
+    function escapeHtml(unsafe) {
+      if (!unsafe) return '';
+      return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Spinner helpers
+    function showSpinner(id) { const el = document.getElementById(id); if (el) el.style.display = 'inline-block'; }
+    function hideSpinner(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+
+    // Keep which device's files are loaded for restore
+    let selectedDeviceForFiles = '';
+
+    // Toggle device inputs to radio for restore mode
+    function toggleDeviceInputsForRestore(isRestore) {
+      const deviceInputs = qsa('#deviceList input[name="devices"]');
+      deviceInputs.forEach(input => {
+        input.type = isRestore ? 'radio' : 'checkbox';
+      });
+      const selectAll = document.getElementById('selectAll');
+      if (selectAll) {
+        selectAll.closest('.form-check').style.display = isRestore ? 'none' : 'block';
+      }
+    }
+
+    // Update visibility of devices/files based on active panel
+    function updateSectionVisibility() {
+      const activePanel = document.querySelector('.panel.active');
+      if (!activePanel) return;
+
+      const devicesSection = document.querySelector('.devices-section');
+      const filesSection = document.querySelector('.files-section');
+
+      if (['executePanel','verifyPanel','schedulePanel','backupPanel','monitorPanel','tigPanel'].includes(activePanel.id)) {
+        if (devicesSection) devicesSection.style.display = 'block';
+        if (filesSection) filesSection.style.display = (activePanel.id === 'restorePanel') ? 'block' : 'none';
+      } else {
+        if (devicesSection) devicesSection.style.display = 'block';
+        if (filesSection) filesSection.style.display = 'block';
+      }
+    }
+
+    // Fetch helper: return parsed JSON if JSON, else return raw text object
+    async function fetchJsonOrText(url, options) {
+      const res = await fetch(url, options);
+      const ctype = res.headers.get('content-type') || '';
+      if (ctype.includes('application/json')) {
+        return await res.json();
+      } else {
+        const txt = await res.text();
+        return { __raw_text: txt, __status: res.status, __ok: res.ok };
+      }
+    }
+
+    // Load backup files for selected device
+    async function loadBackupFiles(deviceLabel) {
       const el = document.querySelector('#fileList');
       const downloadAllBtn = document.querySelector('#downloadAllBtn');
-      
+      if (!el) return;
       el.innerHTML = 'Loading...';
-      downloadAllBtn.style.display = 'none';
-      
-      if (!deviceLabel) { 
-        el.innerHTML = '<div class="small-muted">Select a device to load files</div>'; 
-        return; 
+      if (downloadAllBtn) downloadAllBtn.style.display = 'none';
+
+      if (!deviceLabel) {
+        el.innerHTML = '<div class="small-muted">Select a device to load files</div>';
+        return;
       }
-      
-      // Get selected file mode
+
       const selectedMode = document.querySelector('input[name="fileMode"]:checked')?.value || 'all';
-      
       try {
         const res = await fetch(`/get_backup_files?device=${encodeURIComponent(deviceLabel)}&mode=${selectedMode}`);
         const ctype = res.headers.get('content-type') || '';
@@ -356,110 +630,98 @@
           return;
         }
         const files = await res.json();
-        if (!files || files.length === 0) { 
-          el.innerHTML = `<div class="small-muted">No ${selectedMode === 'golden' ? 'golden' : selectedMode === 'backup' ? 'backup' : ''} files found</div>`; 
-          return; 
+        if (!files || files.length === 0) {
+          el.innerHTML = `<div class="small-muted">No ${selectedMode === 'golden' ? 'golden' : selectedMode === 'backup' ? 'backup' : ''} files found</div>`;
+          return;
         }
-        
+
+        const deviceNameOnly = deviceLabel.split(" ")[0];
         el.innerHTML = '';
         files.forEach((f, idx) => {
-          const fileObj = (typeof f === 'string') ? { name: f, path: f, type: 'backup', date: '', can_mark_golden: true } : f;
+          const fileObj = (typeof f === 'string') ? { name: f, path: f, type: 'backup', date: '', can_mark_golden: true, device_name: deviceNameOnly } : { ...f, device_name: deviceNameOnly };
           const id = `file-${idx}-${Math.floor(Math.random()*10000)}`;
-          
+
           const fileItem = document.createElement('div');
           fileItem.className = 'file-item';
-          
+
           const leftSection = document.createElement('div');
           leftSection.style.display = 'flex';
           leftSection.style.alignItems = 'center';
           leftSection.style.flex = '1';
-          
+
           const checkbox = document.createElement('input');
           checkbox.className = 'form-check-input';
           checkbox.type = 'checkbox';
           checkbox.id = id;
           checkbox.name = 'files';
           checkbox.value = JSON.stringify(fileObj);
-          
+
           const label = document.createElement('label');
           label.className = 'form-check-label ms-2';
           label.htmlFor = id;
           label.style.flex = '1';
-          
+
           const fileName = document.createElement('div');
           fileName.style.fontWeight = '600';
           fileName.textContent = fileObj.name;
-          
+
           const fileInfo = document.createElement('div');
           fileInfo.className = 'small-muted';
           let infoText = fileObj.type || 'backup';
           if (fileObj.date) infoText += ` • ${new Date(fileObj.date).toLocaleDateString()}`;
           fileInfo.textContent = infoText;
-          
-          // Add golden badge if it's a golden config
+
           if (fileObj.type === 'golden_config') {
             const goldenBadge = document.createElement('span');
             goldenBadge.className = 'golden-badge';
             goldenBadge.innerHTML = '<i class="fas fa-star"></i> Golden';
             fileName.appendChild(goldenBadge);
           }
-          
+
           label.appendChild(fileName);
           label.appendChild(fileInfo);
-          
+
           leftSection.appendChild(checkbox);
           leftSection.appendChild(label);
-          
+
           const actionsSection = document.createElement('div');
           actionsSection.className = 'file-actions';
-          
-          // Enhanced Download button - now creates folder structure
+
           const dlBtn = document.createElement('a');
           dlBtn.href = `/download_backup/${encodeURIComponent(deviceLabel)}/${encodeURIComponent(fileObj.path)}`;
           dlBtn.target = '_blank';
           dlBtn.className = 'btn btn-sm btn-outline-primary';
           dlBtn.innerHTML = '<i class="fas fa-download"></i>';
           dlBtn.title = 'Download with folder structure';
-          
+
           actionsSection.appendChild(dlBtn);
-          
-          // Mark as golden button (only for non-golden files)
+
           if (fileObj.can_mark_golden && fileObj.type !== 'golden_config') {
             const goldenBtn = document.createElement('button');
             goldenBtn.className = 'btn btn-sm mark-golden-btn';
             goldenBtn.innerHTML = '<i class="fas fa-star"></i>';
             goldenBtn.title = 'Mark as Golden Config';
-            goldenBtn.addEventListener('click', () => markAsGolden(fileObj, deviceLabel));
+            goldenBtn.addEventListener('click', () => markAsGolden(fileObj, deviceNameOnly));
             actionsSection.appendChild(goldenBtn);
           }
-          
+
           fileItem.appendChild(leftSection);
           fileItem.appendChild(actionsSection);
           el.appendChild(fileItem);
         });
-        
-        // Show download all button if files exist
-        if (files.length > 0) {
+
+        if (files.length > 0 && downloadAllBtn) {
           downloadAllBtn.style.display = 'block';
           downloadAllBtn.onclick = () => downloadAllDeviceFiles(deviceLabel);
         }
-        
-      } catch(err) {
-        el.innerHTML = `<div class="text-danger">Failed to load files: ${err.message}</div>`;
+      } catch (err) {
+        el.innerHTML = `<div class="text-danger">Failed to load files: ${escapeHtml(err.message || String(err))}</div>`;
       }
     }
 
-    // New function to download all files for a device
     function downloadAllDeviceFiles(deviceLabel) {
-      if (!deviceLabel) {
-        alert('No device selected');
-        return;
-      }
-      
-      // Create download link for all files
+      if (!deviceLabel) { alert('No device selected'); return; }
       const downloadUrl = `/download_device_all/${encodeURIComponent(deviceLabel)}`;
-      
-      // Create temporary link and trigger download
       const tempLink = document.createElement('a');
       tempLink.href = downloadUrl;
       tempLink.target = '_blank';
@@ -469,106 +731,6 @@
       document.body.removeChild(tempLink);
     }
 
-    // Enhanced file device selection to show/hide download all button
-    document.addEventListener('DOMContentLoaded', () => {
-      const fileDeviceSelect = document.querySelector('#fileDeviceSelect');
-      if (fileDeviceSelect) {
-        fileDeviceSelect.addEventListener('change', function(){
-          const dev = this.value;
-          const activePanel = document.querySelectorAll('.panel.active')[0];
-          if (activePanel && (activePanel.id === 'backupPanel' || activePanel.id === 'restorePanel')) {
-            loadBackupFiles(dev);
-          } else {
-            document.querySelector('#fileList').innerHTML = '<div class="small-muted">Select a device and file mode to view files</div>';
-            document.querySelector('#downloadAllBtn').style.display = 'none';
-          }
-        });
-      }
-
-      // File mode radio buttons
-      document.querySelectorAll('input[name="fileMode"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-          const dev = document.querySelector('#fileDeviceSelect')?.value;
-          if (dev) loadBackupFiles(dev);
-        });
-      });
-    });
-    // small helpers
-    const qs = (sel, ctx=document) => ctx.querySelector(sel);
-    const qsa = (sel, ctx=document) => Array.from((ctx || document).querySelectorAll(sel));
-
-    // Sidebar switching — also trigger file loading for Backup/Restore
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('.list-group-item');
-      if (btn && btn.dataset && btn.dataset.target) {
-        qsa('.sidebar .list-group-item').forEach(x => x.classList.remove('active'));
-        btn.classList.add('active');
-        qsa('.panel').forEach(p => p.classList.remove('active'));
-        const target = qs('#' + btn.dataset.target);
-        if (target) target.classList.add('active');
-
-        // If user opened backup or restore, try to load files for the selected device
-        if (btn.dataset.target === 'backupPanel' || btn.dataset.target === 'restorePanel') {
-          const dev = qs('#fileDeviceSelect') ? qs('#fileDeviceSelect').value : '';
-          if (dev) loadBackupFiles(dev);
-        }
-        e.preventDefault();
-      }
-    });
-
-    // DOM wiring
-    document.addEventListener('DOMContentLoaded', () => {
-      // device search/select
-      qs('#selectAll')?.addEventListener('change', (e) => {
-        qsa('.device-checkbox').forEach(cb => cb.checked = e.target.checked);
-        updateDeviceCount();
-      });
-      qs('#deviceSearch')?.addEventListener('input', function() {
-        const q = this.value.toLowerCase();
-        let visible = 0;
-        qsa('[data-device-item]').forEach(item => {
-          const txt = item.innerText.toLowerCase();
-          if (!q || txt.includes(q)) { item.style.display = ''; visible++; }
-          else item.style.display = 'none';
-        });
-        qs('#deviceCount').innerText = `Showing ${visible} devices`;
-      });
-      qsa('.device-checkbox').forEach(cb => cb.addEventListener('change', updateDeviceCount));
-      
-      // File device and mode selection
-      qs('#fileDeviceSelect')?.addEventListener('change', function(){
-        const dev = this.value;
-        const activePanel = qsa('.panel.active')[0];
-        if (activePanel && (activePanel.id === 'backupPanel' || activePanel.id === 'restorePanel')) {
-          loadBackupFiles(dev);
-        } else {
-          qs('#fileList').innerHTML = '<div class="small-muted">Select a device and file mode to view files</div>';
-        }
-      });
-
-      // File mode radio buttons
-      qsa('input[name="fileMode"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-          const dev = qs('#fileDeviceSelect')?.value;
-          if (dev) loadBackupFiles(dev);
-        });
-      });
-
-      // action buttons
-      qs('#generateBtn').addEventListener('click', generatePreview);
-      qs('#executeBtn').addEventListener('click', executeFromPrompt);
-      qs('#verifyBtn')?.addEventListener('click', verifyFromPrompt);
-      qs('#backupBtn').addEventListener('click', backupDevices);
-      qs('#prepareRestoreBtn')?.addEventListener('click', prepareRestore);
-      qs('#scheduleBtn')?.addEventListener('click', scheduleBackup);
-      qs('#uploadBtn')?.addEventListener('click', uploadConfig);
-
-      // preview modal apply
-      qs('#applyFromPreviewBtn').addEventListener('click', applyFromPreviewInternal);
-
-      updateDeviceCount();
-    });
-
     function updateDeviceCount(){
       const total = qsa('.device-checkbox').length;
       const checked = qsa('.device-checkbox:checked').length;
@@ -577,19 +739,19 @@
     }
     function getSelectedDevices(){ return qsa('.device-checkbox:checked').map(cb => cb.value); }
 
-    // renderDeviceCard
+    // Render a device card into parent element
     function renderDeviceCard(parentEl, deviceLabel, payload) {
-      const idSafe = btoa(deviceLabel).replace(/=/g,'');
+      const idSafe = btoa(deviceLabel).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
       const collapseId = `collapse-${idSafe}`;
       const card = document.createElement('div'); card.className = 'card device-card';
       const header = document.createElement('div'); header.className = 'card-header d-flex justify-content-between align-items-center';
-      header.innerHTML = `<div><strong>${deviceLabel}</strong> <span class="small-muted ms-2">${payload.message||''}</span></div>
+      header.innerHTML = `<div><strong>${escapeHtml(deviceLabel)}</strong> <span class="small-muted ms-2">${escapeHtml(payload.message||'')}</span></div>
                           <div><button class="btn btn-sm btn-link" data-bs-toggle="collapse" data-bs-target="#${collapseId}">Toggle</button></div>`;
       card.appendChild(header);
 
       const statusDiv = document.createElement('div'); statusDiv.style.padding='8px';
       statusDiv.className = payload.success ? 'status-success' : 'status-fail';
-      statusDiv.innerHTML = payload.success ? 'Status: ✅ Success' : `Status: ❌ Failed - ${payload.message||''}`;
+      statusDiv.innerHTML = payload.success ? 'Status: ✅ Success' : `Status: ❌ Failed - ${escapeHtml(payload.message||'')}`;
       card.appendChild(statusDiv);
 
       const bodyWrap = document.createElement('div'); bodyWrap.className = 'collapse show'; bodyWrap.id = collapseId;
@@ -614,7 +776,7 @@
         const diffLabel = document.createElement('div'); diffLabel.className='small-muted'; diffLabel.style.marginTop='8px'; diffLabel.textContent='Configuration Diff:';
         body.appendChild(diffLabel);
         const diffBlock = document.createElement('div'); diffBlock.className='diff-block';
-        const diffLines = payload.config_diff.split(/\r?\n/);
+        const diffLines = String(payload.config_diff).split(/\r?\n/);
         diffLines.forEach(line => {
           const span = document.createElement('div');
           if (line.startsWith('+')) { span.className='diff-plus'; span.textContent = line; }
@@ -641,23 +803,14 @@
       bodyWrap.appendChild(body); card.appendChild(bodyWrap); parentEl.prepend(card);
     }
 
-    // API helpers: return parsed JSON or raw text for debugging
-    async function fetchJsonOrText(url, options){
-      const res = await fetch(url, options);
-      const ctype = res.headers.get('content-type') || '';
-      if (ctype.includes('application/json')) {
-        return await res.json();
-      } else {
-        const txt = await res.text();
-        return { __raw_text: txt, __status: res.status, __ok: res.ok };
-      }
-    }
-
-    // Generate preview only (calls /generate_config_only)
+    // Generate preview only
     async function generatePreview(){
       const devices = getSelectedDevices();
       const prompt = qs('#promptText').value.trim();
       if (!devices.length || !prompt) { alert('Select devices and enter prompt'); return; }
+
+      showSpinner('generateSpinner');
+
       try {
         const data = await fetchJsonOrText('/generate_config_only', {
           method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, prompt })
@@ -672,7 +825,9 @@
         qs('#previewNote').innerText = '';
         new bootstrap.Modal(qs('#previewModal')).show();
       } catch(err) {
-        alert('Preview failed: ' + err.message);
+        alert('Preview failed: ' + (err.message || String(err)));
+      } finally {
+        hideSpinner('generateSpinner');
       }
     }
 
@@ -680,52 +835,93 @@
       const devices = getSelectedDevices();
       const commands = qs('#previewEditable').value.trim();
       if (!devices.length || !commands) { alert('Select devices and ensure commands present'); return; }
-      await executeCommandWithPrompt(devices, commands);
+      await executeCommandWithPrompt(devices, commands, 'applyPreviewSpinner');
       const modalEl = qs('#previewModal');
       const modal = bootstrap.Modal.getInstance(modalEl);
       if (modal) modal.hide();
     }
 
-    // Execute: send prompt (or raw commands) to /execute_command
+    // Execute: send prompt to /execute_command
     async function executeFromPrompt(){
       const devices = getSelectedDevices();
       const prompt = qs('#promptText').value.trim();
       if (!devices.length || !prompt) { alert('Select devices and enter prompt'); return; }
-      await executeCommandWithPrompt(devices, prompt);
+      await executeCommandWithPrompt(devices, prompt, 'executeSpinner');
     }
 
-    async function executeCommandWithPrompt(devices, prompt){
+    async function executeCommandWithPrompt(devices, prompt, spinnerId){
       clearArea('#execResults');
       const area = qs('#execResults');
+
+      showSpinner(spinnerId);
+
       try {
         const data = await fetchJsonOrText('/execute_command', {
-          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, prompt })
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ devices, prompt })
         });
+
         if (data.__raw_text) {
           area.innerHTML = `<div class="alert alert-danger">Server returned HTML (status ${data.__status}). See raw output below:<pre style="max-height:300px;overflow:auto">${escapeHtml(data.__raw_text)}</pre></div>`;
           return;
         }
-        if (data.error) { area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`; return; }
-        (data.device_results || []).forEach(devRes => {
+        if (data.error) {
+          area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`;
+          return;
+        }
+
+        const results = Array.isArray(data.device_results) ? data.device_results : [];
+
+        results.forEach(devRes => {
           renderDeviceCard(area, devRes.device, {
-            success: devRes.success,
+            success: !!devRes.success,
             message: devRes.message,
-            command_outputs: devRes.command_outputs,
+            command_outputs: Array.isArray(devRes.command_outputs) ? devRes.command_outputs : [],
             config_diff: devRes.config_diff
           });
         });
+
+        // Cache run for PDF
+        window.lastExecRun = {
+          prompt,
+          devices,
+          timestamp: new Date().toISOString(),
+          results: (data.device_results || []).map(r => ({
+            device: r.device,
+            success: !!r.success,
+            message: r.message || '',
+            command_outputs: Array.isArray(r.command_outputs) ? r.command_outputs : [],
+            config_diff: r.config_diff || ''
+          }))
+        };
+
+        const dlBtn = document.getElementById('execDownloadPdfBtn');
+        if (dlBtn) dlBtn.style.display = results.length ? 'inline-block' : 'none';
+
+        // Prefetch AI explanations if available (non-blocking for user)
+        const btn = document.getElementById('execDownloadPdfBtn');
+        if (btn) { btn.style.display = 'inline-block'; btn.disabled = true; btn.textContent = 'Building explanations…'; }
+        try { await ensureAiExplanations(window.lastExecRun); } catch(e){}
+        finally { if (btn){ btn.disabled = false; btn.textContent = 'Download Summary (PDF)'; } }
+
         showPanelById('executePanel');
-      } catch(err) {
-        area.innerHTML = `<div class="text-danger">Execute failed: ${err.message}</div>`;
+      } catch (err) {
+        area.innerHTML = `<div class="text-danger">Execute failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner(spinnerId);
       }
     }
 
-    // Verify: send prompt to /verify_command
+    // Verify command (AI-assisted)
     async function verifyFromPrompt(){
       const devices = getSelectedDevices();
       const prompt = (qs('#verifyPrompt')?.value || qs('#promptText')?.value || '').trim();
       if (!devices.length || !prompt) { alert('Select devices and enter verify prompt'); return; }
       clearArea('#verifyResults'); const area = qs('#verifyResults');
+
+      showSpinner('verifySpinner');
+
       try {
         const data = await fetchJsonOrText('/verify_command', {
           method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, prompt })
@@ -735,25 +931,132 @@
           return;
         }
         if (data.error) { area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`; return; }
-        (data.device_results || []).forEach(devRes => {
+
+        const results = Array.isArray(data.device_results) ? data.device_results : [];
+
+        results.forEach(devRes => {
           renderDeviceCard(area, devRes.device, {
-            success: devRes.success,
+            success: !!devRes.success,
             message: devRes.message,
-            command_outputs: devRes.command_outputs,
+            command_outputs: Array.isArray(devRes.command_outputs) ? devRes.command_outputs : [],
             config_diff: devRes.config_diff
           });
         });
+
+        // Remember the run and build explanations
+window.lastVerifyRun = {
+  prompt,
+  devices,
+  timestamp: new Date().toISOString(),
+  results: (data.device_results || []).map(r => ({
+    device: r.device,
+    success: !!r.success,
+    message: r.message || '',
+    command_outputs: Array.isArray(r.command_outputs) ? r.command_outputs : [],
+    config_diff: r.config_diff || ''
+  }))
+};
+
+const vbtn = document.getElementById('verifyDownloadPdfBtn'); // or your execute PDF button id
+if (vbtn) {
+  vbtn.style.display = 'inline-block';
+  vbtn.disabled = true;
+  vbtn.textContent = 'Building explanations…';
+}
+try { await ensureAiExplanations(window.lastVerifyRun); }
+finally {
+  if (vbtn) { vbtn.disabled = false; vbtn.textContent = 'Download Summary (PDF)'; }
+}
+
+
         showPanelById('verifyPanel');
       } catch(err) {
-        area.innerHTML = `<div class="text-danger">Verify failed: ${err.message}</div>`;
+        area.innerHTML = `<div class="text-danger">Verify failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('verifySpinner');
       }
     }
 
-    // Backup: call /backup_devices and then reload file list for selected device (if available)
+    // Run as-is (no AI)
+    async function runAsisFromPrompt() {
+      const prompt = qs('#verifyPrompt').value.trim();
+      const devices = getSelectedDevices();
+
+      if (!prompt || devices.length === 0) {
+        alert("Please select devices and enter commands.");
+        return;
+      }
+
+      const pdfBtn = document.getElementById('verifyDownloadPdfBtn');
+      if (pdfBtn) pdfBtn.style.display = 'none';
+
+      showSpinner('asisSpinner');
+
+      try {
+        const res = await fetch('/run_asis_command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ devices, prompt })
+        });
+
+        // Be tolerant: server might return JSON or raw text
+        const ctype = res.headers.get('content-type') || '';
+        if (!ctype.includes('application/json')) {
+          const raw = await res.text();
+          qs('#verifyResults').innerHTML = `<div class="alert alert-danger">Server returned non-JSON response: <pre style="max-height:300px;overflow:auto">${escapeHtml(raw)}</pre></div>`;
+          return;
+        }
+        const data = await res.json();
+
+        const resultsDiv = document.getElementById('verifyResults');
+        resultsDiv.innerHTML = '';
+
+        if (data.error) {
+          resultsDiv.innerHTML = `<div class="text-danger">${escapeHtml(data.error)}</div>`;
+          return;
+        }
+
+        const results = Array.isArray(data.device_results) ? data.device_results : [];
+        results.forEach(dr => {
+          renderDeviceCard(resultsDiv, dr.device, {
+            success: !!dr.success,
+            message: dr.message || '',
+            command_outputs: Array.isArray(dr.command_outputs) ? dr.command_outputs : [],
+            config_diff: dr.config_diff || ''
+          });
+        });
+
+        // cache latest VERIFY (Run As-Is) run for PDF
+        window.lastVerifyRun = {
+          prompt,
+          devices,
+          timestamp: new Date().toISOString(),
+          results: results.map(r => ({
+            device: r.device,
+            success: !!r.success,
+            message: r.message || '',
+            command_outputs: Array.isArray(r.command_outputs) ? r.command_outputs : [],
+            config_diff: r.config_diff || ''
+          }))
+        };
+        if (pdfBtn) pdfBtn.style.display = results.length ? 'inline-block' : 'none';
+
+      } catch (err) {
+        document.getElementById('verifyResults').innerHTML =
+          `<div class="text-danger">Error: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('asisSpinner');
+      }
+    }
+
+    // Backup selected devices
     async function backupDevices(){
       const devices = getSelectedDevices();
       if (!devices.length) { alert('Select devices to backup'); return; }
       clearArea('#backupResults'); const area = qs('#backupResults');
+
+      showSpinner('backupSpinner');
+
       try {
         const data = await fetchJsonOrText('/backup_devices', {
           method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices })
@@ -766,7 +1069,6 @@
 
         (data.results || []).forEach(item => {
           let payload = { success: item.success, message: item.message, command_outputs: [], config_diff: '' };
-          // server may provide download_url
           if (item.download_url) {
             try {
               const parts = item.download_url.split('/download_backup/')[1];
@@ -779,124 +1081,19 @@
           renderDeviceCard(area, item.device, payload);
         });
 
-        // After backup, refresh file list for selected device (if user selected one)
-        const devSel = qs('#fileDeviceSelect') ? qs('#fileDeviceSelect').value : '';
-        if (devSel) loadBackupFiles(devSel);
-
         showPanelById('backupPanel');
       } catch(err) {
-        area.innerHTML = `<div class="text-danger">Backup failed: ${err.message}</div>`;
+        area.innerHTML = `<div class="text-danger">Backup failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('backupSpinner');
       }
     }
 
-    // Load backup/current/golden files for device with mode filter
-    async function loadBackupFiles(deviceLabel){
-      const el = qs('#fileList');
-      el.innerHTML = 'Loading...';
-      if (!deviceLabel) { el.innerHTML = '<div class="small-muted">Select a device to load files</div>'; return; }
-      
-      // Get selected file mode
-      const selectedMode = qs('input[name="fileMode"]:checked')?.value || 'all';
-      
-      try {
-        const res = await fetch(`/get_backup_files?device=${encodeURIComponent(deviceLabel)}&mode=${selectedMode}`);
-        const ctype = res.headers.get('content-type') || '';
-        if (!ctype.includes('application/json')) {
-          const txt = await res.text();
-          el.innerHTML = `<div class="text-danger">Server returned non-JSON: ${escapeHtml(txt.slice(0,1000))}</div>`;
-          return;
-        }
-        const files = await res.json();
-        if (!files || files.length === 0) { 
-          el.innerHTML = `<div class="small-muted">No ${selectedMode === 'golden' ? 'golden' : selectedMode === 'backup' ? 'backup' : ''} files found</div>`; 
-          return; 
-        }
-        
-        el.innerHTML = '';
-        files.forEach((f, idx) => {
-          const fileObj = (typeof f === 'string') ? { name: f, path: f, type: 'backup', date: '', can_mark_golden: true } : f;
-          const id = `file-${idx}-${Math.floor(Math.random()*10000)}`;
-          
-          const fileItem = document.createElement('div');
-          fileItem.className = 'file-item';
-          
-          const leftSection = document.createElement('div');
-          leftSection.style.display = 'flex';
-          leftSection.style.alignItems = 'center';
-          leftSection.style.flex = '1';
-          
-          const checkbox = document.createElement('input');
-          checkbox.className = 'form-check-input';
-          checkbox.type = 'checkbox';
-          checkbox.id = id;
-          checkbox.name = 'files';
-          checkbox.value = JSON.stringify(fileObj);
-          
-          const label = document.createElement('label');
-          label.className = 'form-check-label ms-2';
-          label.htmlFor = id;
-          label.style.flex = '1';
-          
-          const fileName = document.createElement('div');
-          fileName.style.fontWeight = '600';
-          fileName.textContent = fileObj.name;
-          
-          const fileInfo = document.createElement('div');
-          fileInfo.className = 'small-muted';
-          let infoText = fileObj.type || 'backup';
-          if (fileObj.date) infoText += ` • ${new Date(fileObj.date).toLocaleDateString()}`;
-          fileInfo.textContent = infoText;
-          
-          // Add golden badge if it's a golden config
-          if (fileObj.type === 'golden_config') {
-            const goldenBadge = document.createElement('span');
-            goldenBadge.className = 'golden-badge';
-            goldenBadge.innerHTML = '<i class="fas fa-star"></i> Golden';
-            fileName.appendChild(goldenBadge);
-          }
-          
-          label.appendChild(fileName);
-          label.appendChild(fileInfo);
-          
-          leftSection.appendChild(checkbox);
-          leftSection.appendChild(label);
-          
-          const actionsSection = document.createElement('div');
-          actionsSection.className = 'file-actions';
-          
-          // Download button
-          const dlBtn = document.createElement('a');
-          dlBtn.href = `/download_backup/${encodeURIComponent(deviceLabel)}/${encodeURIComponent(fileObj.path)}`;
-          dlBtn.target = '_blank';
-          dlBtn.className = 'btn btn-sm btn-outline-primary';
-          dlBtn.innerHTML = '<i class="fas fa-download"></i>';
-          dlBtn.title = 'Download';
-          
-          actionsSection.appendChild(dlBtn);
-          
-          // Mark as golden button (only for non-golden files)
-          if (fileObj.can_mark_golden && fileObj.type !== 'golden_config') {
-            const goldenBtn = document.createElement('button');
-            goldenBtn.className = 'btn btn-sm mark-golden-btn';
-            goldenBtn.innerHTML = '<i class="fas fa-star"></i>';
-            goldenBtn.title = 'Mark as Golden Config';
-            goldenBtn.addEventListener('click', () => markAsGolden(fileObj, deviceLabel));
-            actionsSection.appendChild(goldenBtn);
-          }
-          
-          fileItem.appendChild(leftSection);
-          fileItem.appendChild(actionsSection);
-          el.appendChild(fileItem);
-        });
-      } catch(err) {
-        el.innerHTML = `<div class="text-danger">Failed to load files: ${err.message}</div>`;
-      }
-    }
-
-    // Mark backup as golden config
+    // Mark a file as golden
     async function markAsGolden(fileObj, deviceLabel) {
+      showSpinner('markGoldenSpinner');
       try {
-        const deviceName = fileObj.device_name || deviceLabel.split(' ')[0]; // Extract device name
+        const deviceName = fileObj.device_name || deviceLabel.split(' ')[0];
         const response = await fetch('/mark_as_golden', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -906,10 +1103,9 @@
             file_type: fileObj.type
           })
         });
-        
+
         const result = await response.json();
         if (result.success) {
-          // Show success message
           const toast = document.createElement('div');
           toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
           toast.style.top = '20px';
@@ -920,81 +1116,109 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
           `;
           document.body.appendChild(toast);
-          
-          // Auto-remove toast after 5 seconds
-          setTimeout(() => {
-            if (toast.parentNode) {
-              toast.parentNode.removeChild(toast);
-            }
-          }, 5000);
-          
-          // Refresh file list to show the new golden config
-          const devSel = qs('#fileDeviceSelect')?.value;
-          if (devSel) loadBackupFiles(devSel);
+          setTimeout(() => { toast.parentNode && toast.parentNode.removeChild(toast); }, 5000);
+          if (selectedDeviceForFiles) loadBackupFiles(selectedDeviceForFiles);
         } else {
-          alert('Failed to mark as golden: ' + result.error);
+          alert('Failed to mark as golden: ' + (result.error || 'unknown'));
         }
       } catch (err) {
-        alert('Error marking as golden: ' + err.message);
+        alert('Error marking as golden: ' + (err.message || String(err)));
+      } finally {
+        hideSpinner('markGoldenSpinner');
       }
     }
 
-    // Prepare restore UI - shows Restore Selected button and ensures file list is loaded
-    function prepareRestore(){
-      const devices = getSelectedDevices();
-      if (!devices.length) { alert('Select devices to restore'); return; }
-      // Make sure file list is populated for current selected device in the selector
-      const deviceSelectVal = qs('#fileDeviceSelect') ? qs('#fileDeviceSelect').value : '';
-      if (!deviceSelectVal) {
-        alert('Select a device in the Files panel first');
+    // Restore selected files
+    async function restoreDevices() {
+      const checkedFiles = qsa('#fileList input[name="files"]:checked');
+      if (!checkedFiles.length) {
+        alert('Please select backup files to restore');
         return;
       }
-      
-      // Set file mode based on restore type selection
-      const restoreType = (qs('input[name="restoreType"]:checked') || {value:'backup'}).value;
-      if (restoreType === 'golden') {
-        qs('#modeGolden').checked = true;
-      } else {
-        qs('#modeBackup').checked = true;
+      if (!selectedDeviceForFiles) {
+        alert('Please select a device first');
+        return;
       }
-      
-      loadBackupFiles(deviceSelectVal);
+      const selectedFiles = checkedFiles.map(cb => {
+        try { return JSON.parse(cb.value); }
+        catch (e) { console.error('Failed to parse file data:', cb.value); return null; }
+      }).filter(f => f !== null);
 
-      showPanelById('restorePanel');
+      if (!selectedFiles.length) { alert('No valid files selected'); return; }
+
+      clearArea('#restoreResults');
       const area = qs('#restoreResults');
-      area.innerHTML = `<div class="small-muted">Select files from left panel then click <strong>Restore Selected</strong>.</div>
-        <div class="mt-2"><button id="confirmRestore" class="btn btn-primary">Restore Selected</button></div>`;
-      qs('#confirmRestore').addEventListener('click', restoreDevices);
-    }
+      showSpinner('restoreSpinner');
 
-    // Restore selected files (calls /restore_devices)
-    async function restoreDevices(){
-      const devices = getSelectedDevices();
-      if (!devices.length) { alert('Select devices to restore'); return; }
-      const checked = qsa('#fileList input[name="files"]:checked');
-      if (!checked.length) { alert('Select files from left panel first'); return; }
-      const selected_files = checked.map(cb => JSON.parse(cb.value));
-      const restore_type = (qs('input[name="restoreType"]:checked') || {value:'backup'}).value;
-      clearArea('#restoreResults'); const area = qs('#restoreResults');
       try {
-        const data = await fetchJsonOrText('/restore_devices', {
-          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, files: selected_files, restore_type })
+        const response = await fetch('/restore_devices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device: selectedDeviceForFiles, files: selectedFiles })
         });
-        if (data.__raw_text) {
-          area.innerHTML = `<div class="alert alert-danger">Server returned HTML (status ${data.__status}). See raw output below:<pre style="max-height:300px;overflow:auto">${escapeHtml(data.__raw_text)}</pre></div>`;
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const text = await response.text();
+          area.innerHTML = `<div class="alert alert-danger">Server returned non-JSON response (status ${response.status}): <pre style="max-height:300px;overflow:auto">${escapeHtml(text)}</pre></div>`;
           return;
         }
+
+        const data = await response.json();
         if (data.error) { area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`; return; }
-        (data.results || []).forEach(r => {
-          renderDeviceCard(area, r.device, {
-            success: r.success,
-            message: r.message || '',
-            command_outputs: (r.messages || []).map(m => ({command: 'restore', output: m})),
-            config_diff: ''
-          });
+
+        (data.results || []).forEach(deviceResult => {
+          const cardHtml = `
+            <div class="card device-card mb-2">
+              <div class="card-header d-flex justify-content-between">
+                <strong>${escapeHtml(deviceResult.device)}</strong>
+                <span class="badge ${deviceResult.success ? 'bg-success' : 'bg-danger'}">
+                  ${deviceResult.success ? 'Success' : 'Failed'}
+                </span>
+              </div>
+              <div class="card-body">
+                <div class="${deviceResult.success ? 'status-success' : 'status-fail'}">
+                  ${escapeHtml(deviceResult.message || '')}
+                </div>
+                ${deviceResult.messages && deviceResult.messages.length ? `
+                  <div class="mt-2">
+                    <small class="text-muted">Restore Details:</small>
+                    <ul class="list-unstyled mt-1">
+                      ${deviceResult.messages.map(msg => `<li class="small">${escapeHtml(msg)}</li>`).join('')}
+                    </ul>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+          area.innerHTML += cardHtml;
         });
-      } catch(err) {
-        area.innerHTML = `<div class="text-danger">Restore failed: ${err.message}</div>`;
+
+        const successCount = (data.results || []).filter(r => r.success).length;
+        const totalCount = (data.results || []).length;
+
+        if (successCount === totalCount) {
+          area.insertAdjacentHTML('afterbegin', `
+            <div class="alert alert-success mb-3">
+              <i class="fas fa-check-circle me-2"></i>
+              Restore completed successfully for all ${totalCount} device(s)
+            </div>
+          `);
+        } else {
+          area.insertAdjacentHTML('afterbegin', `
+            <div class="alert alert-warning mb-3">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Restore completed for ${successCount} of ${totalCount} device(s)
+            </div>
+          `);
+        }
+
+        showPanelById('restorePanel');
+      } catch (err) {
+        console.error('Restore error:', err);
+        area.innerHTML = `<div class="alert alert-danger">Restore failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('restoreSpinner');
       }
     }
 
@@ -1005,6 +1229,9 @@
       const time = qs('#scheduleTime').value;
       if (!devices.length || !date || !time) { alert('Select devices and set date/time'); return; }
       clearArea('#schedResults'); const area = qs('#schedResults');
+
+      showSpinner('scheduleSpinner');
+
       try {
         const data = await fetchJsonOrText('/schedule_backup', {
           method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ devices, date, time })
@@ -1017,20 +1244,23 @@
         else area.innerHTML = `<div class="alert alert-success">${escapeHtml(data.message || 'Scheduled')}</div>`;
         showPanelById('schedulePanel');
       } catch(err) {
-        area.innerHTML = `<div class="text-danger">Schedule failed: ${err.message}</div>`;
+        area.innerHTML = `<div class="text-danger">Schedule failed: ${escapeHtml(err.message || String(err))}</div>`;
+      } finally {
+        hideSpinner('scheduleSpinner');
       }
     }
 
     // Upload config file
     async function uploadConfig(){
       const input = qs('#uploadInput');
-      const files = input.files;
+      const files = input ? input.files : null;
       if (!files || files.length === 0) { alert('Choose a file to upload'); return; }
-      const type = qs('#uploadType').value || 'backup';
+      const type = (qs('#uploadType') && qs('#uploadType').value) || 'backup';
       const form = new FormData(); form.append('config_file', files[0]); form.append('config_type', type);
-      const deviceSel = qs('#fileDeviceSelect').value;
-      if (deviceSel) form.append('device', deviceSel);
       clearArea('#uploadResults'); const area = qs('#uploadResults');
+
+      showSpinner('uploadSpinner');
+
       try {
         const res = await fetch('/upload_config', { method:'POST', body: form });
         const ctype = res.headers.get('content-type') || '';
@@ -1043,19 +1273,314 @@
         if (data.error) area.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`;
         else {
           area.innerHTML = `<div class="alert alert-success">${escapeHtml(data.message)}</div>`;
-          // reload file list for selected device so uploaded file appears
-          if (deviceSel) loadBackupFiles(deviceSel);
         }
         showPanelById('uploadPanel');
       } catch(err) {
-        area.innerHTML = `<div class="text-danger">Upload failed: ${err.message}</div>`;
+        area.innerHTML = `<div class="text-danger">Upload failed: ${escapeHtml(err.message || String(err))}</div>`;
       } finally {
-        input.value = '';
+        if (input) input.value = '';
+        hideSpinner('uploadSpinner');
       }
     }
 
-    // Utility helpers
+    // Health and connectivity checks
+    async function healthCheck(){
+      const devices = getSelectedDevices();
+      if(!devices.length){ alert('Select devices'); return; }
+      showSpinner('healthSpinner');
+      try {
+        const res = await fetch('/health_check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+        const data = await res.json();
+        renderHealthResults(data);
+      } catch(e){ alert('Health check failed: '+(e.message||String(e))); }
+      hideSpinner('healthSpinner');
+    }
+
+    async function connectivityCheck(){
+      const devices = getSelectedDevices();
+      if(!devices.length){ alert('Select devices'); return; }
+      showSpinner('connectivitySpinner');
+      try {
+        const res = await fetch('/connectivity_check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+        const data = await res.json();
+        renderConnectivityResults(data);
+      } catch(e){ alert('Connectivity check failed: '+(e.message||String(e))); }
+      hideSpinner('connectivitySpinner');
+    }
+
+    // Simple renderers (placeholders you can replace with richer visualizations)
+    function renderHealthResults(data){
+      const container = document.getElementById('monitorResults');
+      container.innerHTML = '';
+      if (!data || !Array.isArray(data.results)) {
+        container.innerHTML = '<div class="small-muted">No health data available.</div>';
+        return;
+      }
+      data.results.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'card mb-2';
+        card.innerHTML = `<div class="card-body"><div><strong>${escapeHtml(r.device||'Device')}</strong></div>
+                          <div class="small-muted">${escapeHtml(r.summary||'Summary')}</div></div>`;
+        container.appendChild(card);
+      });
+    }
+
+    function renderConnectivityResults(data){
+      const container = document.getElementById('monitorResults');
+      container.innerHTML = '';
+      if (!data || !Array.isArray(data.results)) {
+        container.innerHTML = '<div class="small-muted">No connectivity data available.</div>';
+        return;
+      }
+      data.results.forEach(r => {
+        const state = r.online ? 'Online' : 'Offline';
+        const card = document.createElement('div');
+        card.className = 'card mb-2';
+        card.innerHTML = `<div class="card-body"><div><strong>${escapeHtml(r.device||'Device')}</strong> — ${escapeHtml(state)}</div>
+                          <div class="small-muted">${escapeHtml(r.details||'')}</div></div>`;
+        container.appendChild(card);
+      });
+    }
+
+    // AI explain helpers (uses /ai/explain)
+    async function collectUniqueCommandsFromRun(run){
+      if (!run || !Array.isArray(run.results)) return [];
+      const set = new Set();
+      run.results.forEach(r => (r.command_outputs||[]).forEach(co => {
+        const cmd = (co.command || '');
+        cmd.split('\n').forEach(line => { const s = line.trim(); if (s) set.add(s); });
+      }));
+      return Array.from(set);
+    }
+    async function ensureAiExplanations(lastRun) {
+  try {
+    if (!lastRun || !Array.isArray(lastRun.results)) return;
+
+    // Build list of {command, output}
+    const items = [];
+    lastRun.results.forEach(r => {
+      (r.command_outputs || []).forEach(co => {
+        if (!co) return;
+        items.push({
+          command: String(co.command || '').trim(),
+          output: String(co.output || '')
+        });
+      });
+    });
+    if (!items.length) return;
+
+    const res = await fetch('/ai/explain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items })
+    });
+    const data = await res.json();
+    if (!data || !data.success) return;
+
+    // Index by command for convenient lookup
+    window.aiExplainIndex = new Map();
+    (data.explanations || []).forEach(e => {
+      if (e && e.command) window.aiExplainIndex.set(e.command, e);
+    });
+  } catch (e) {
+    console.error('ensureAiExplanations failed', e);
+  }
+}
+
+    // PDF helpers using jsPDF
+    window.lastExecRun = null;
+    window.lastVerifyRun = null;
+
+    function _nowStamp() {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+    }
+
+    function _inferCommandUse(cmd="") {
+      const c = cmd.toLowerCase().trim();
+      if (c.startsWith('show run') || c.startsWith('show running')) return 'Show current running configuration';
+      if (c.startsWith('show ip int') || c.startsWith('show interfaces')) return 'Show interface status and IP info';
+      if (c.startsWith('ping')) return 'Connectivity test (ICMP)';
+      if (c.startsWith('copy run start') || c.startsWith('copy running')) return 'Save running config to startup';
+      if (c.startsWith('conf t') || c.startsWith('configure terminal')) return 'Enter global configuration mode';
+      if (c.startsWith('interface ')) return 'Enter interface configuration';
+      if (c.startsWith('no ')) return 'Remove/disable a setting';
+      return 'Command execution';
+    }
+
+    function _addWrapped(doc, text, x, y, maxW, lineH, pageH, bottom) {
+      const lines = doc.splitTextToSize(text, maxW);
+      for (const ln of lines) {
+        if (y > pageH - bottom) { doc.addPage(); y = 60; }
+        doc.text(ln, x, y); y += lineH;
+      }
+      return y;
+    }
+
+    // === REPLACE your entire downloadRunPdf with this ===
+function downloadRunPdf(run, kind){
+  if (!run || !Array.isArray(run.results) || !run.results.length) { alert('No results yet.'); return; }
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF) { alert('PDF library not loaded'); return; }
+
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const left = 50, right = 50, top = 60, bottom = 60, width = pageW - left - right;
+  let y = top;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  y = _addWrapped(doc, `Network Configuration Manager — ${kind} Summary`, left, y, width, 18, pageH, bottom);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  y += 8;
+  y = _addWrapped(doc, `Date: ${new Date(run.timestamp).toString()}`, left, y, width, 14, pageH, bottom);
+  y = _addWrapped(doc, `Devices: ${(run.devices||[]).join(', ')}`, left, y, width, 14, pageH, bottom);
+  y += 6;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  y = _addWrapped(doc, 'Purpose:', left, y, width, 16, pageH, bottom);
+  doc.setFont('helvetica','normal'); 
+  y = _addWrapped(doc, run.prompt || '(not provided)', left, y, width, 14, pageH, bottom);
+  y += 8;
+
+  const richMap = run.aiRichMap || {};      // { command -> {what_it_does, how_to_use, what_the_output_means, key_points[] } }
+  const simpleMap = run.aiExpMap || {};     // { command -> single-line explanation } (fallback)
+
+  (run.results || []).forEach((r, idx) => {
+    if (idx>0) y += 6;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    y = _addWrapped(doc, `Device: ${r.device}`, left, y, width, 16, pageH, bottom);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    const status = r.success ? 'Success' : 'Failed';
+    y = _addWrapped(doc, `Status: ${status}${r.message ? ' — ' + r.message : ''}`, left, y, width, 14, pageH, bottom);
+
+    if (Array.isArray(r.command_outputs) && r.command_outputs.length){
+      y += 6;
+      doc.setFont('helvetica','bold'); 
+      y = _addWrapped(doc, 'Commands — What, How & Output:', left, y, width, 16, pageH, bottom);
+      doc.setFont('helvetica','normal');
+
+      r.command_outputs.forEach(co => {
+        const cmd = (co.command || '').trim();
+        const output = (co.output || '').trim();
+
+        // Prefer rich structured explanation; otherwise fallback to simpleMap; otherwise heuristic
+        const exp = richMap[cmd] || null;
+        const simple = simpleMap[cmd] || simpleMap[cmd.trim()] || '';
+        const fallbackLine = simple && simple.length > 3 ? simple : _inferCommandUse(cmd);
+
+        // Command
+        y = _addWrapped(doc, `• Command: ${cmd}`, left, y, width, 14, pageH, bottom);
+
+        if (exp) {
+          y = _addWrapped(doc, `  What this does: ${exp.what_it_does || fallbackLine}`, left, y, width, 14, pageH, bottom);
+          y = _addWrapped(doc, `  How to run: ${exp.how_to_use || 'Run from device CLI (exec/privileged mode). Read-only show commands are safe.'}`, left, y, width, 14, pageH, bottom);
+          y = _addWrapped(doc, `  What the output means: ${exp.what_the_output_means || ''}`, left, y, width, 14, pageH, bottom);
+          if (Array.isArray(exp.key_points) && exp.key_points.length){
+            y = _addWrapped(doc, `  Key points:`, left, y, width, 14, pageH, bottom);
+            exp.key_points.forEach(pt => {
+              y = _addWrapped(doc, `    • ${pt}`, left, y, width, 14, pageH, bottom);
+            });
+          }
+        } else {
+          y = _addWrapped(doc, `  Why/Use: ${fallbackLine}`, left, y, width, 14, pageH, bottom);
+          y = _addWrapped(doc, `  (No AI output-specific explanation available)`, left, y, width, 14, pageH, bottom);
+        }
+
+        // Output (trim super long)
+        const MAX = 4000;
+        const outText = output.length > MAX ? output.slice(0, MAX) + ' …(truncated)' : (output || '(no output)');
+        y = _addWrapped(doc, `  Output:\n${outText}`, left + 12, y, width - 12, 14, pageH, bottom);
+        y += 4;
+      });
+    }
+
+    if (r.config_diff){
+      y += 6;
+      doc.setFont('helvetica','bold');
+      y = _addWrapped(doc, 'Configuration Diff:', left, y, width, 16, pageH, bottom);
+      doc.setFont('helvetica','normal');
+      y = _addWrapped(doc, r.config_diff, left+12, y, width-12, 14, pageH, bottom);
+    }
+  });
+
+  const pages = doc.internal.getNumberOfPages();
+  for (let p=1; p<=pages; p++){ doc.setPage(p); doc.setFontSize(10); doc.text(String(p), pageW-right, pageH-20, {align:'right'}); }
+  doc.save(`${kind.toLowerCase()}_summary_${_nowStamp()}.pdf`);
+}
+
+
+// === REPLACE your entire ensureAiExplanations with this ===
+// Tries rich (command+output) explanations first; falls back to commands-only.
+async function ensureAiExplanations(run){
+  if (!run) return;
+  // If already fetched rich map, we're done
+  if (run.aiRichMap) return;
+
+  try {
+    // Build unique list of items: {command, output}
+    const items = [];
+    const seen = new Set();
+    (run.results || []).forEach(r => (r.command_outputs || []).forEach(co => {
+      const cmd = String(co?.command || '').trim();
+      const out = String(co?.output || '');
+      if (!cmd) return;
+      const key = cmd; // one per command; if you prefer per (cmd+out), use `${cmd}||${out.slice(0,512)}`
+      if (seen.has(key)) return;
+      seen.add(key);
+      items.push({ command: cmd, output: out });
+    }));
+
+    // 1) Try rich, contextual explanations (command + output)
+    if (items.length){
+      const resp = await fetch('/ai/explain', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ items })
+      });
+      if (resp.ok){
+        const data = await resp.json();
+        if (data && data.success && Array.isArray(data.explanations)){
+          const richMap = {};
+          data.explanations.forEach(e => {
+            if (e && e.command) richMap[e.command.trim()] = e;
+          });
+          run.aiRichMap = richMap;
+          // Also fill simple map for backwards compatibility
+          const simpleMap = {};
+          Object.keys(richMap).forEach(k => {
+            simpleMap[k] = (richMap[k].what_it_does || '').trim();
+          });
+          run.aiExpMap = simpleMap;
+          return;
+        }
+      }
+    }
+
+    // 2) Fallback: commands-only explanation (older endpoint behavior)
+    const cmds = items.map(it => it.command);
+    if (!cmds.length) return;
+    const resp2 = await fetch('/ai/explain', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ commands: cmds })
+    });
+    if (resp2.ok){
+      const data2 = await resp2.json();
+      const map = {};
+      (data2.explanations||[]).forEach(row => {
+        if (row && row.command) map[row.command.trim()] = (row.explanation||'').trim();
+      });
+      run.aiExpMap = map; // simple string explanations (no output context)
+    }
+  } catch (e) {
+    console.warn('AI explain failed', e);
+  }
+}
+
+    // Clear area helper
     function clearArea(sel){ const el = qs(sel); if (el) el.innerHTML = ''; }
+
+    // Show a particular panel
     function showPanelById(id){
       qsa('.panel').forEach(p => p.classList.remove('active'));
       const p = qs('#' + id);
@@ -1064,27 +1589,710 @@
       const btn = qsa(`.sidebar .list-group-item[data-target="${id}"]`)[0];
       if (btn) btn.classList.add('active');
 
-      // When showing backup/restore ensure file list loads for selected device
-      if (id === 'backupPanel' || id === 'restorePanel') {
-        const dev = qs('#fileDeviceSelect') ? qs('#fileDeviceSelect').value : '';
-        if (dev) loadBackupFiles(dev);
+      updateSectionVisibility();
+
+      if (id === 'restorePanel' && selectedDeviceForFiles) {
+        loadBackupFiles(selectedDeviceForFiles);
       }
     }
 
-    function escapeHtml(unsafe) {
-      if (!unsafe) return '';
-      return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // Wire up event listeners once DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize visibility
+      updateSectionVisibility();
+
+      // Device search
+      qs('#deviceSearch')?.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        let visible = 0;
+        qsa('[data-device-item]').forEach(item => {
+          const txt = item.innerText.toLowerCase();
+          if (!q || txt.includes(q)) { item.style.display = ''; visible++; }
+          else item.style.display = 'none';
+        });
+        qs('#deviceCount').innerText = `Showing ${visible} devices`;
+      });
+
+      // Select all devices
+      qs('#selectAll')?.addEventListener('change', (e) => {
+        qsa('.device-checkbox').forEach(cb => cb.checked = e.target.checked);
+        updateDeviceCount();
+      });
+
+      // Device checkbox changes
+      qsa('.device-checkbox').forEach(cb => cb.addEventListener('change', function() {
+        updateDeviceCount();
+        if (this.checked) {
+          selectedDeviceForFiles = this.value;
+          loadBackupFiles(selectedDeviceForFiles);
+        }
+      }));
+
+      // File mode filtering reloads files
+      qsa('input[name="fileMode"]').forEach(r => r.addEventListener('change', () => {
+        if (selectedDeviceForFiles) loadBackupFiles(selectedDeviceForFiles);
+      }));
+
+      // Action buttons
+      qs('#generateBtn')?.addEventListener('click', generatePreview);
+      qs('#executeBtn')?.addEventListener('click', executeFromPrompt);
+      qs('#verifyBtn')?.addEventListener('click', verifyFromPrompt);
+      qs('#backupBtn')?.addEventListener('click', backupDevices);
+      qs('#restoreBtn')?.addEventListener('click', restoreDevices);
+      qs('#scheduleBtn')?.addEventListener('click', scheduleBackup);
+      qs('#uploadBtn')?.addEventListener('click', uploadConfig);
+      qs('#runAsisBtn')?.addEventListener('click', runAsisFromPrompt);
+
+      // Preview modal apply
+      qs('#applyFromPreviewBtn')?.addEventListener('click', applyFromPreviewInternal);
+
+      // Wire PDF buttons
+      const execPdf = qs('#execDownloadPdfBtn');
+      if (execPdf) execPdf.addEventListener('click', async () => { await ensureAiExplanations(window.lastExecRun).catch(()=>{}); downloadRunPdf(window.lastExecRun, 'EXECUTE'); });
+
+      const verifyPdf = qs('#verifyDownloadPdfBtn');
+      if (verifyPdf) verifyPdf.addEventListener('click', async () => { await ensureAiExplanations(window.lastVerifyRun).catch(()=>{}); downloadRunPdf(window.lastVerifyRun, 'VERIFY'); });
+
+      // Sidebar switching
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.list-group-item');
+        if (btn && btn.dataset && btn.dataset.target) {
+          qsa('.sidebar .list-group-item').forEach(x => x.classList.remove('active'));
+          btn.classList.add('active');
+          qsa('.panel').forEach(p => p.classList.remove('active'));
+          const target = qs('#' + btn.dataset.target);
+          if (target) target.classList.add('active');
+
+          updateSectionVisibility();
+          toggleDeviceInputsForRestore(btn.dataset.target === 'restorePanel');
+          qsa('#deviceList input[name="devices"]').forEach(input=>{input.checked=false;});
+
+          if (btn.dataset.target === 'restorePanel' && selectedDeviceForFiles) {
+            loadBackupFiles(selectedDeviceForFiles);
+          }
+          e.preventDefault();
+        }
+      });
+
+      // TIG event wiring
+      const tigStatusBtn = document.getElementById('tigStatusBtn');
+      const tigConfigBtn = document.getElementById('tigConfigBtn');
+      const tigSaveConfigBtn = document.getElementById('tigSaveConfigBtn');
+      const tigStartBtn = document.getElementById('tigStartBtn');
+      const tigStopBtn = document.getElementById('tigStopBtn');
+
+      if (tigStatusBtn) tigStatusBtn.addEventListener('click', checkTigStatus);
+      if (tigConfigBtn) tigConfigBtn.addEventListener('click', () => {
+        const container = document.getElementById('tigConfigContainer');
+        container.style.display = container.style.display === 'none' ? 'block' : 'none';
+      });
+      if (tigSaveConfigBtn) tigSaveConfigBtn.addEventListener('click', saveTigConfig);
+      if (tigStartBtn) tigStartBtn.addEventListener('click', startTigCollection);
+      if (tigStopBtn) tigStopBtn.addEventListener('click', stopTigCollection);
+    });
+
+    // TIG helpers (status / start / stop / save) - these call server endpoints
+    async function checkTigStatus() {
+      showSpinner('tigStatusSpinner');
+      try {
+        const res = await fetch('/tig/status');
+        const json = res.ok ? await res.json() : null;
+        const influx = qs('#influxStatus'), graf = qs('#grafanaStatus'), tel = qs('#telegrafStatus');
+        if (json) {
+          influx.innerHTML = `<span class="status-indicator ${json.influx === 'running' ? 'status-running' : json.influx === 'stopped' ? 'status-stopped' : 'status-unknown'}"></span> ${escapeHtml(json.influx || 'Unknown')}`;
+          graf.innerHTML = `<span class="status-indicator ${json.grafana === 'running' ? 'status-running' : json.grafana === 'stopped' ? 'status-stopped' : 'status-unknown'}"></span> ${escapeHtml(json.grafana || 'Unknown')}`;
+          tel.innerHTML = `<span class="status-indicator ${json.telegraf === 'running' ? 'status-running' : json.telegraf === 'stopped' ? 'status-stopped' : 'status-unknown'}"></span> ${escapeHtml(json.telegraf || 'Unknown')}`;
+        } else {
+          if (influx) influx.innerHTML = `<span class="status-indicator status-unknown"></span> Error`;
+          if (graf) graf.innerHTML = `<span class="status-indicator status-unknown"></span> Error`;
+          if (tel) tel.innerHTML = `<span class="status-indicator status-unknown"></span> Error`;
+        }
+      } catch (err) {
+        console.warn('TIG status failed', err);
+      } finally {
+        hideSpinner('tigStatusSpinner');
+      }
     }
 
-    // Wire applyFromPreview
-    (function ensureModalApplyBinding(){
-      const btn = qs('#applyFromPreviewBtn');
-      if (btn && !btn._bound) {
-        btn.addEventListener('click', applyFromPreviewInternal);
-        btn._bound = true;
-      }
-    })();
+    async function saveTigConfig() {
+      const url = qs('#influxUrl').value;
+      const graf = qs('#grafanaUrl').value;
+      const interval = qs('#collectionInterval').value;
+      showSpinner('tigStatusSpinner');
+      try {
+        const res = await fetch('/tig/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ influx_url: url, grafana_url: graf, interval: interval })});
+        const data = res.ok ? await res.json() : null;
+        if (data && data.success) alert('TIG configuration saved');
+        else alert('Failed to save TIG configuration');
+      } catch(e) { alert('Error saving TIG config: ' + (e.message||String(e))); }
+      hideSpinner('tigStatusSpinner');
+    }
+
+    async function startTigCollection() {
+      showSpinner('tigStatusSpinner');
+      try {
+        const res = await fetch('/tig/start', { method:'POST' });
+        const data = res.ok ? await res.json() : null;
+        if (data && data.success) checkTigStatus();
+        else alert('Failed to start monitoring');
+      } catch(e) { alert('Error starting monitoring: ' + (e.message||String(e))); }
+      hideSpinner('tigStatusSpinner');
+    }
+
+    async function stopTigCollection() {
+      showSpinner('tigStatusSpinner');
+      try {
+        const res = await fetch('/tig/stop', { method:'POST' });
+        const data = res.ok ? await res.json() : null;
+        if (data && data.success) checkTigStatus();
+        else alert('Failed to stop monitoring');
+      } catch(e) { alert('Error stopping monitoring: ' + (e.message||String(e))); }
+      hideSpinner('tigStatusSpinner');
+    }
 
   </script>
-</body>
-</html>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    async function healthCheck(){
+      const devices = Array.from(document.querySelectorAll('.device-checkbox:checked')).map(cb=>cb.value);
+      if(!devices.length){ alert('Select devices'); return; }
+      document.getElementById('healthSpinner').style.display='inline-block';
+      try {
+        const res = await fetch('/health_check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+        const data = await res.json();
+        renderHealthResults(data);   // ✅ render chart + details
+      } catch(e){ alert('Health check failed: '+e.message); }
+      document.getElementById('healthSpinner').style.display='none';
+    }
+    
+    async function connectivityCheck(){
+      const devices = Array.from(document.querySelectorAll('.device-checkbox:checked')).map(cb=>cb.value);
+      if(!devices.length){ alert('Select devices'); return; }
+      document.getElementById('connectivitySpinner').style.display='inline-block';
+      try {
+        const res = await fetch('/connectivity_check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+        const data = await res.json();
+        renderConnectivityResults(data);   // ✅ render online/offline cards
+      } catch(e){ alert('Connectivity check failed: '+e.message); }
+      document.getElementById('connectivitySpinner').style.display='none';
+    }
+    
+    document.addEventListener('DOMContentLoaded',()=>{
+      if(document.getElementById('healthBtn')) document.getElementById('healthBtn').onclick=healthCheck;
+      if(document.getElementById('connectivityBtn')) document.getElementById('connectivityBtn').onclick=connectivityCheck;
+    });
+    
+    // ✅ new renderers
+    function renderHealthResults(data){
+      const container = document.getElementById('monitorResults');
+      container.innerHTML = "";
+      if(!data.results) return;
+    
+      const labels = data.results.map(r => r.device.split(' ')[0]);
+      const cpuData = data.results.map(r => r.cpu ?? 0);
+      const memData = data.results.map(r => r.memory ?? 0);
+    
+      // Create chart container
+      const chartBox = document.createElement("div");
+      chartBox.className = "chart-box mb-4";
+      chartBox.style.cssText = `
+        background: white; 
+        border-radius: 8px; 
+        padding: 20px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        height: 350px;
+      `;
+      chartBox.innerHTML = `<canvas id="healthChart" width="400" height="300"></canvas>`;
+      container.appendChild(chartBox);
+    
+      const ctx = document.getElementById("healthChart").getContext("2d");
+      
+      // Destroy existing chart if it exists
+      if (window.healthChartInstance) {
+        window.healthChartInstance.destroy();
+      }
+      
+      window.healthChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { 
+              label: 'CPU %', 
+              data: cpuData, 
+              backgroundColor: '#4a90e2',
+              borderColor: '#357abd',
+              borderWidth: 1,
+              borderRadius: 4,
+              borderSkipped: false
+            },
+            { 
+              label: 'Memory %', 
+              data: memData, 
+              backgroundColor: '#e74c3c',
+              borderColor: '#c0392b',
+              borderWidth: 1,
+              borderRadius: 4,
+              borderSkipped: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { 
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                padding: 15,
+                font: { size: 12, weight: 'bold' }
+              }
+            },
+            title: { 
+              display: true, 
+              text: 'Device Health (CPU & Memory)',
+              font: { size: 16, weight: 'bold' },
+              padding: { bottom: 20 }
+            }
+          },
+          scales: { 
+            x: {
+              grid: { display: false },
+              ticks: {
+                font: { size: 12, weight: 'bold' },
+                color: '#333'
+              }
+            },
+            y: { 
+              beginAtZero: true, 
+              max: 100,
+              grid: { 
+                color: 'rgba(0,0,0,0.1)',
+                borderDash: [2, 2]
+              },
+              ticks: {
+                font: { size: 11 },
+                callback: function(value) {
+                  return value + '%';
+                }
+              }
+            }
+          },
+          // Add data labels on bars
+          onHover: (event, activeElements) => {
+            event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.parsed.y + '%';
+                }
+              }
+            }
+          }
+        },
+        plugins: [{
+          afterDatasetsDraw: function(chart) {
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((dataset, i) => {
+              const meta = chart.getDatasetMeta(i);
+              meta.data.forEach((bar, index) => {
+                const value = dataset.data[index];
+                if (value > 0) {
+                  ctx.fillStyle = 'white';
+                  ctx.font = 'bold 12px Arial';
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  
+                  const x = bar.x;
+                  const y = bar.y + (bar.height / 2);
+                  
+                  ctx.fillText(value + '%', x, y);
+                }
+              });
+            });
+          }
+        }]
+      });
+    
+      // Device details cards
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "mt-4";
+      container.appendChild(detailsContainer);
+    
+      data.results.forEach(r => {
+        const statusColor = r.status === 'healthy' ? '#28a745' : '#dc3545';
+        const card = document.createElement("div");
+        card.className = "card mb-2";
+        card.style.cssText = `border-left: 4px solid ${statusColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);`;
+        
+        card.innerHTML = `
+          <div class="card-body py-3">
+            <div class="row align-items-center">
+              <div class="col-md-3">
+                <div class="fw-bold">${r.device.split(' ')[0]}</div>
+                <div class="small text-muted">${r.device.match(/\((.*)\)/)?.[1] || ''}</div>
+              </div>
+              <div class="col-md-2">
+                <span class="badge px-2 py-1" style="background-color: ${statusColor}; color: white;">
+                  ${r.status === 'healthy' ? 'Healthy' : r.status}
+                </span>
+              </div>
+              <div class="col-md-2 text-center">
+                <div class="small text-muted">CPU Usage</div>
+                <div class="fw-bold fs-5">${r.cpu_text || 'N/A'}</div>
+              </div>
+              <div class="col-md-2 text-center">
+                <div class="small text-muted">Memory Usage</div>
+                <div class="fw-bold fs-5">${r.memory_text || 'N/A'}</div>
+              </div>
+              <div class="col-md-3">
+                <div class="small text-muted">Uptime</div>
+                <div class="small">${r.uptime || 'N/A'}</div>
+              </div>
+            </div>
+          </div>
+        `;
+        detailsContainer.appendChild(card);
+      });
+    }
+    
+    function renderConnectivityResults(data){
+      const container = document.getElementById('monitorResults');
+      container.innerHTML = "";
+      if(!data.results) return;
+      data.results.forEach(r=>{
+        const card = document.createElement("div");
+        card.className = "health-card card mb-2 p-2";
+        card.innerHTML = `
+          <strong>${r.device}</strong><br/>
+          ${r.reachable ? 
+            '<span class="status-online">🟢 Online</span>' : 
+            '<span class="status-offline">🔴 Offline</span>'}
+          <div class="small-muted">${r.message}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+    
+    // TIG Stack Integration
+    let tigConfig = {
+      influxUrl: 'http://localhost:8086',
+      grafanaUrl: 'http://localhost:3000',
+      collectionInterval: 30
+    };
+    
+    async function checkTigStatus() {
+      showSpinner('tigStatusSpinner');
+      try {
+        const response = await fetch('/tig_status', {
+          method: 'GET',
+          headers: {'Content-Type': 'application/json'}
+        });
+        const data = await response.json();
+        
+        updateServiceStatus('influxStatus', data.influxdb);
+        updateServiceStatus('grafanaStatus', data.grafana);
+        updateServiceStatus('telegrafStatus', data.telegraf);
+        
+        if (data.grafana.running) {
+          setupGrafanaEmbed();
+        }
+        
+        if (data.metrics) {
+          displayDeviceMetrics(data.metrics);
+        }
+        
+      } catch (error) {
+        console.error('TIG status check failed:', error);
+        updateServiceStatus('influxStatus', {running: false, message: 'Connection failed'});
+        updateServiceStatus('grafanaStatus', {running: false, message: 'Connection failed'});
+        updateServiceStatus('telegrafStatus', {running: false, message: 'Connection failed'});
+      } finally {
+        hideSpinner('tigStatusSpinner');
+      }
+    }
+    
+    function updateServiceStatus(elementId, status) {
+      const element = document.getElementById(elementId);
+      const indicator = element.querySelector('.status-indicator');
+      
+      if (status.running) {
+        indicator.className = 'status-indicator status-running';
+        element.innerHTML = `<span class="status-indicator status-running"></span>Running - ${status.message || 'OK'}`;
+      } else {
+        indicator.className = 'status-indicator status-stopped';
+        element.innerHTML = `<span class="status-indicator status-stopped"></span>Stopped - ${status.message || 'Not running'}`;
+      }
+    }
+    
+    function setupGrafanaEmbed() {
+      const container = document.getElementById('grafanaContainer');
+      const embed = document.getElementById('grafanaEmbed');
+      const link = document.getElementById('grafanaLink');
+      
+      const dashboardUrl = `${tigConfig.grafanaUrl}/d/network-devices/network-devices-monitoring?orgId=1&kiosk=1`;
+      const fullUrl = `${tigConfig.grafanaUrl}/d/network-devices/network-devices-monitoring`;
+      
+      embed.src = dashboardUrl;
+      link.href = fullUrl;
+      container.style.display = 'block';
+    }
+    
+    function displayDeviceMetrics(metrics) {
+      const grid = document.getElementById('metricsGrid');
+      const container = document.getElementById('tigMetricsContainer');
+      
+      grid.innerHTML = '';
+      
+      Object.entries(metrics).forEach(([device, data]) => {
+        const card = document.createElement('div');
+        card.className = 'metric-card';
+        card.innerHTML = `
+          <div class="metric-value">${data.cpu || 'N/A'}%</div>
+          <div class="metric-label">CPU - ${device}</div>
+        `;
+        grid.appendChild(card);
+        
+        const memCard = document.createElement('div');
+        memCard.className = 'metric-card';
+        memCard.innerHTML = `
+          <div class="metric-value">${data.memory || 'N/A'}%</div>
+          <div class="metric-label">Memory - ${device}</div>
+        `;
+        grid.appendChild(memCard);
+      });
+      
+      container.style.display = 'block';
+    }
+    
+    async function saveTigConfig() {
+      const config = {
+        influxUrl: document.getElementById('influxUrl').value,
+        grafanaUrl: document.getElementById('grafanaUrl').value,
+        collectionInterval: parseInt(document.getElementById('collectionInterval').value)
+      };
+      
+      try {
+        const response = await fetch('/tig_config', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(config)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          tigConfig = config;
+          alert('TIG configuration saved successfully');
+        } else {
+          alert('Failed to save configuration: ' + result.error);
+        }
+      } catch (error) {
+        alert('Error saving configuration: ' + error.message);
+      }
+    }
+    
+    async function startTigCollection() {
+      const devices = getSelectedDevices();
+      if (!devices.length) {
+        alert('Please select devices to monitor');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/tig_start', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({devices: devices})
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('TIG monitoring started for selected devices');
+          checkTigStatus();
+        } else {
+          alert('Failed to start monitoring: ' + result.error);
+        }
+      } catch (error) {
+        alert('Error starting monitoring: ' + error.message);
+      }
+    }
+    
+    async function stopTigCollection() {
+      try {
+        const response = await fetch('/tig_stop', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('TIG monitoring stopped');
+          checkTigStatus();
+        } else {
+          alert('Failed to stop monitoring: ' + result.error);
+        }
+      } catch (error) {
+        alert('Error stopping monitoring: ' + error.message);
+      }
+    }
+    
+    // Event listeners for TIG panel
+    document.addEventListener('DOMContentLoaded', () => {
+      const tigStatusBtn = document.getElementById('tigStatusBtn');
+      const tigConfigBtn = document.getElementById('tigConfigBtn');
+      const tigSaveConfigBtn = document.getElementById('tigSaveConfigBtn');
+      const tigStartBtn = document.getElementById('tigStartBtn');
+      const tigStopBtn = document.getElementById('tigStopBtn');
+      
+      if (tigStatusBtn) tigStatusBtn.addEventListener('click', checkTigStatus);
+      
+      if (tigConfigBtn) {
+        tigConfigBtn.addEventListener('click', () => {
+          const container = document.getElementById('tigConfigContainer');
+          container.style.display = container.style.display === 'none' ? 'block' : 'none';
+        });
+      }
+      
+      if (tigSaveConfigBtn) tigSaveConfigBtn.addEventListener('click', saveTigConfig);
+      if (tigStartBtn) tigStartBtn.addEventListener('click', startTigCollection);
+      if (tigStopBtn) tigStopBtn.addEventListener('click', stopTigCollection);
+    });
+    
+    
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+      // ====== PDF helpers & run state ======
+      window.lastExecRun = null;
+      window.lastVerifyRun = null;
+      
+      function _nowStamp() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+      }
+      
+      function _inferCommandUse(cmd="") {
+        const c = cmd.toLowerCase().trim();
+        // Very lightweight heuristics; extend as you like:
+        if (c.startsWith('show run') || c.startsWith('show running')) return 'Show current running configuration';
+        if (c.startsWith('show ip int') || c.startsWith('show interfaces')) return 'Show interface status and IP info';
+        if (c.startsWith('ping')) return 'Connectivity test (ICMP echo)';
+        if (c.startsWith('copy run start') || c.startsWith('copy running')) return 'Save running config to startup';
+        if (c.startsWith('conf t') || c.startsWith('configure terminal')) return 'Enter global configuration mode';
+        if (c.startsWith('interface ')) return 'Enter interface configuration';
+        if (c.startsWith('no ')) return 'Remove/disable a setting';
+        return 'Command execution';
+      }
+      
+      function _addWrapped(doc, text, x, y, maxWidth, lineH, pageH, bottomMargin) {
+        const lines = doc.splitTextToSize(text, maxWidth);
+        for (const ln of lines) {
+          if (y > pageH - bottomMargin) {
+            doc.addPage(); y = 60;
+          }
+          doc.text(ln, x, y);
+          y += lineH;
+        }
+        return y;
+      }
+      
+      function downloadRunPdf(run, kind /* 'EXECUTE' | 'VERIFY' */) {
+        if (!run) { alert('No results to export yet. Execute/Verify first.'); return; }
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) { alert('jsPDF not loaded'); return; }
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const left = 50, right = 50, top = 60, bottom = 60, width = pageW - left - right;
+        let y = top;
+      
+        // Header
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+        y = _addWrapped(doc, `Network Configuration Manager — ${kind} Summary`, left, y, width, 18, pageH, bottom);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+        y += 8;
+        y = _addWrapped(doc, `Date: ${new Date(run.timestamp).toString()}`, left, y, width, 14, pageH, bottom);
+        y = _addWrapped(doc, `Devices: ${run.devices.join(', ')}`, left, y, width, 14, pageH, bottom);
+        y += 6;
+      
+        // Purpose (use the user's prompt as "what is the use")
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        y = _addWrapped(doc, 'Purpose:', left, y, width, 16, pageH, bottom);
+        doc.setFont('helvetica', 'normal');
+        y = _addWrapped(doc, run.prompt || '(not provided)', left, y, width, 14, pageH, bottom);
+        y += 8;
+      
+        // Results per device
+        (run.results || []).forEach((r, idx) => {
+          if (idx > 0) y += 6;
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+          y = _addWrapped(doc, `Device: ${r.device}`, left, y, width, 16, pageH, bottom);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+      
+          const status = r.success ? 'Success' : 'Failed';
+          y = _addWrapped(doc, `Status: ${status}${r.message ? ` — ${r.message}` : ''}`, left, y, width, 14, pageH, bottom);
+      
+          // Commands & outputs
+          if (Array.isArray(r.command_outputs) && r.command_outputs.length) {
+            y += 6;
+            doc.setFont('helvetica', 'bold');
+            y = _addWrapped(doc, 'Commands & Output:', left, y, width, 16, pageH, bottom);
+            doc.setFont('helvetica', 'normal');
+            r.command_outputs.forEach((co, j) => {
+              const cmd = (co.command || '').trim();
+              const out = (co.output || '').trim();
+              y = _addWrapped(doc, `• Command: ${cmd}`, left, y, width, 14, pageH, bottom);
+              y = _addWrapped(doc, `  Use: ${_inferCommandUse(cmd)}`, left, y, width, 14, pageH, bottom);
+              // Limit extremely long outputs (tweak as needed)
+              const MAX = 4000;
+              const outText = out.length > MAX ? out.slice(0, MAX) + ' …(truncated)' : out || '(no output)';
+              y = _addWrapped(doc, `  Output:\n${outText}`, left + 12, y, width - 12, 14, pageH, bottom);
+              y += 4;
+            });
+          }
+      
+          // Config diff (if present)
+          if (r.config_diff) {
+            y += 6;
+            doc.setFont('helvetica', 'bold');
+            y = _addWrapped(doc, 'Configuration Diff:', left, y, width, 16, pageH, bottom);
+            doc.setFont('helvetica', 'normal');
+            y = _addWrapped(doc, r.config_diff, left + 12, y, width - 12, 14, pageH, bottom);
+          }
+        });
+      
+        // Footer page numbers
+        const pages = doc.internal.getNumberOfPages();
+        for (let p = 1; p <= pages; p++) {
+          doc.setPage(p);
+          doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+          doc.text(String(p), pageW - right, pageH - 20, { align: 'right' });
+        }
+      
+        const fname = `${kind.toLowerCase()}_summary_${_nowStamp()}.pdf`;
+        doc.save(fname);
+      }
+      
+      // ====== Wire buttons once DOM is ready ======
+      document.addEventListener('DOMContentLoaded', () => {
+        const execBtn = document.getElementById('execDownloadPdfBtn');
+        if (execBtn) execBtn.addEventListener('click', () => downloadRunPdf(window.lastExecRun, 'EXECUTE'));
+      
+        const verifyBtn = document.getElementById('verifyDownloadPdfBtn');
+        if (verifyBtn) verifyBtn.addEventListener('click', () => downloadRunPdf(window.lastVerifyRun, 'VERIFY'));
+      });
+    
+      </script>
+      
+    
+    
+    
+    </body>
+    </html>
+    
