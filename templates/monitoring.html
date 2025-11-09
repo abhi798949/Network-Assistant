@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Network Monitoring - Grafana</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #4a90e2;
+      --bg-from: #667eea;
+      --bg-to: #764ba2;
+    }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, var(--bg-from) 0%, var(--bg-to) 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .app-frame {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .app-header {
+      background: linear-gradient(90deg, var(--accent), #357abd);
+      color: white;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .service-card {
+      background: white;
+      border: 1px solid #e9ecef;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transition: all 0.3s ease;
+    }
+    .service-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .status-badge.running {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status-badge.stopped {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .status-badge.checking {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status-dot.running {
+      background: #10b981;
+      animation: pulse 2s infinite;
+    }
+    .status-dot.stopped {
+      background: #ef4444;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .dashboard-embed {
+      width: 100%;
+      height: 600px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      background: #f9fafb;
+    }
+    .action-section {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid var(--accent);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-left: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .info-box {
+      background: #e0f2fe;
+      border-left: 4px solid #0284c7;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .dashboard-link {
+      display: block;
+      padding: 12px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      text-decoration: none;
+      color: #1f2937;
+      transition: all 0.2s;
+    }
+    .dashboard-link:hover {
+      background: #f9fafb;
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateX(5px);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-header">
+      <div>
+        <h4 class="mb-0"><i class="fas fa-chart-line me-2"></i>Network Monitoring Dashboard</h4>
+        <small>Real-time metrics powered by TIG Stack</small>
+      </div>
+      <div>
+        <a href="/" class="btn btn-light btn-sm me-2"><i class="fas fa-arrow-left me-1"></i>Back to NCM</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
+      </div>
+    </div>
+
+    <div class="p-4">
+      <!-- Services Status Section -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <h5 class="mb-3">Service Status</h5>
+        </div>
+        <div class="col-md-4">
+          <div class="service-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <i class="fas fa-database text-info me-2"></i>
+                <strong>InfluxDB</strong>
+              </div>
+              <span id="influxStatus" class="status-badge checking">
+                <span class="status-dot"></span>
+                Checking...
+              </span>
+            </div>
+            <small class="text-muted">Time-series database for metrics storage</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="service-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <i class="fas fa-chart-area text-warning me-2"></i>
+                <strong>Grafana</strong>
+              </div>
+              <span id="grafanaStatus" class="status-badge checking">
+                <span class="status-dot"></span>
+                Checking...
+              </span>
+            </div>
+            <small class="text-muted">Visualization and dashboard platform</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="service-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <i class="fas fa-satellite-dish text-success me-2"></i>
+                <strong>SNMP Monitor</strong>
+              </div>
+              <span id="snmpStatus" class="status-badge checking">
+                <span class="status-dot"></span>
+                Checking...
+              </span>
+            </div>
+            <small class="text-muted">Network device metrics collection</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions Section -->
+      <div class="action-section">
+        <h5 class="mb-3">Dashboard Management</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <button id="checkStatusBtn" class="btn btn-primary w-100 mb-2">
+              <i class="fas fa-sync-alt me-2"></i>Refresh Status
+              <span id="statusSpinner" class="spinner" style="display:none;"></span>
+            </button>
+          </div>
+          <div class="col-md-6">
+            <button id="createDashboardsBtn" class="btn btn-success w-100 mb-2">
+              <i class="fas fa-plus-circle me-2"></i>View Dashboards
+              <span id="createSpinner" class="spinner" style="display:none;"></span>
+            </button>
+          </div>
+        </div>
+        <div id="actionResult" class="mt-3"></div>
+      </div>
+
+      <!-- Info Box -->
+      <div class="info-box">
+        <strong><i class="fas fa-info-circle me-2"></i>Quick Start:</strong>
+        <ol class="mb-0 mt-2">
+          <li>Ensure InfluxDB and Grafana services are running</li>
+          <li>Click "Create/Update Dashboards" to set up monitoring dashboards</li>
+          <li>Select a dashboard below to view real-time metrics</li>
+        </ol>
+      </div>
+
+      <!-- Available Dashboards -->
+      <div id="dashboardsSection" style="display:none;">
+        <h5 class="mb-3">Available Dashboards</h5>
+        <div id="dashboardsList"></div>
+      </div>
+
+      <!-- Dashboard Embed -->
+      <div id="dashboardEmbed" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Live Dashboard View</h5>
+          <a id="openFullDashboard" href="#" target="_blank" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-external-link-alt me-1"></i>Open in Grafana
+          </a>
+        </div>
+        <iframe id="grafanaFrame" class="dashboard-embed" src="" frameborder="0"></iframe>
+      </div>
+
+      <!-- Metrics Summary -->
+      <div id="metricsSection" style="display:none;" class="mt-4">
+        <h5 class="mb-3">Quick Metrics</h5>
+        <div class="row">
+          <div class="col-md-3">
+            <div class="service-card text-center">
+              <div class="text-muted mb-1">Devices Monitored</div>
+              <div class="h3 mb-0" id="deviceCount">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="service-card text-center">
+              <div class="text-muted mb-1">Avg CPU Usage</div>
+              <div class="h3 mb-0" id="avgCpu">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="service-card text-center">
+              <div class="text-muted mb-1">Avg Memory Usage</div>
+              <div class="h3 mb-0" id="avgMemory">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="service-card text-center">
+              <div class="text-muted mb-1">Data Points (24h)</div>
+              <div class="h3 mb-0" id="dataPoints">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const GRAFANA_URL = window.location.origin; // Adjust if Grafana is on different host
+
+    // Update status badge
+    function updateStatus(elementId, isRunning, message = '') {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      
+      const statusClass = isRunning ? 'running' : 'stopped';
+      const statusText = isRunning ? 'Running' : 'Stopped';
+      const dotClass = isRunning ? 'running' : 'stopped';
+      
+      el.className = `status-badge ${statusClass}`;
+      el.innerHTML = `
+        <span class="status-dot ${dotClass}"></span>
+        ${statusText}${message ? ` - ${message}` : ''}
+      `;
+    }
+
+    // Check service status
+    async function checkStatus() {
+      const spinner = document.getElementById('statusSpinner');
+      spinner.style.display = 'inline-block';
+      
+      try {
+        const response = await fetch('/status');
+        const data = await response.json();
+        
+        console.log('Status response:', data);
+        
+        // Update service statuses
+        updateStatus('snmpStatus', data.snmp_monitoring, 
+          data.snmp_monitoring ? `${data.devices_loaded} devices` : 'Not started');
+        updateStatus('influxStatus', data.influxdb_connected, 
+          data.influxdb_connected ? data.influxdb_bucket : 'Not connected');
+        updateStatus('grafanaStatus', data.grafana_running, 
+          data.grafana_running ? 'Connected' : 'Not reachable');
+        
+        // Show metrics if available
+        if (data.influxdb_connected) {
+          await loadMetrics();
+        }
+        
+      } catch (error) {
+        console.error('Status check failed:', error);
+        showMessage('Failed to check service status', 'danger');
+      } finally {
+        spinner.style.display = 'none';
+      }
+    }
+
+    // Create dashboards
+    async function createDashboards() {
+      const spinner = document.getElementById('createSpinner');
+      const resultDiv = document.getElementById('actionResult');
+      
+      spinner.style.display = 'inline-block';
+      resultDiv.innerHTML = '<div class="alert alert-info">Creating dashboards... This may take a moment.</div>';
+      
+      try {
+        const response = await fetch('/create_proper_dashboards', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Dashboard creation response:', data);
+        
+        if (data.success) {
+          const resultsHTML = Array.isArray(data.results) 
+            ? data.results.map(r => `<li>${r.name || 'Dashboard'}: ${r.result?.uid || 'Created'}</li>`).join('')
+            : '<li>Dashboards created successfully</li>';
+          
+          resultDiv.innerHTML = `
+            <div class="alert alert-success">
+              <strong>✓ Success!</strong> Dashboards created successfully.
+              <ul class="mb-0 mt-2">
+                ${resultsHTML}
+              </ul>
+            </div>
+          `;
+          
+          // Load dashboards if URLs provided
+          if (data.dashboard_urls && Array.isArray(data.dashboard_urls)) {
+            loadDashboards(data.dashboard_urls);
+          } else if (data.urls && Array.isArray(data.urls)) {
+            loadDashboards(data.urls);
+          } else {
+            // Construct default URLs
+            const grafanaUrl = window.location.origin.replace(':5000', ':3000');
+            loadDashboards([
+              `${grafanaUrl}/d/network-device-dashboard`,
+              `${grafanaUrl}/d/interface-metrics-dashboard`
+            ]);
+          }
+        } else {
+          resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+              <strong>✗ Error:</strong> ${data.error || 'Unknown error occurred'}
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Dashboard creation failed:', error);
+        resultDiv.innerHTML = `
+          <div class="alert alert-danger">
+            <strong>✗ Error:</strong> ${error.message}
+            <br><small class="text-muted">Check browser console for details</small>
+          </div>
+        `;
+      } finally {
+        spinner.style.display = 'none';
+      }
+    }
+
+    // Load available dashboards
+    function loadDashboards(urls) {
+      const section = document.getElementById('dashboardsSection');
+      const list = document.getElementById('dashboardsList');
+      
+      if (!urls || !Array.isArray(urls) || urls.length === 0) {
+        console.warn('No dashboard URLs provided');
+        section.style.display = 'none';
+        return;
+      }
+      
+      const dashboards = [
+        { name: 'Network Device Dashboard', url: urls[0], icon: 'fa-network-wired' },
+        { name: 'Interface Metrics Dashboard', url: urls[1] || urls[0], icon: 'fa-ethernet' }
+      ];
+      
+      list.innerHTML = dashboards.map(d => `
+        <a href="#" class="dashboard-link" onclick="embedDashboard('${d.url}'); return false;">
+          <i class="fas ${d.icon} me-2"></i>
+          <strong>${d.name}</strong>
+          <i class="fas fa-chevron-right float-end"></i>
+        </a>
+      `).join('');
+      
+      section.style.display = 'block';
+      
+      // Auto-load first dashboard
+      if (urls[0]) {
+        embedDashboard(urls[0]);
+      }
+    }
+
+    // Embed dashboard
+    function embedDashboard(url) {
+      const embedDiv = document.getElementById('dashboardEmbed');
+      const iframe = document.getElementById('grafanaFrame');
+      const link = document.getElementById('openFullDashboard');
+      
+      // Add kiosk mode for clean embed
+      const embedUrl = url.includes('?') ? `${url}&kiosk` : `${url}?kiosk`;
+      
+      iframe.src = embedUrl;
+      link.href = url;
+      embedDiv.style.display = 'block';
+      
+      // Scroll to dashboard
+      embedDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Load metrics summary
+    async function loadMetrics() {
+      try {
+        const response = await fetch('/tig_status');
+        const data = await response.json();
+        
+        if (data.metrics) {
+          document.getElementById('deviceCount').textContent = data.metrics.device_count || '-';
+          document.getElementById('avgCpu').textContent = 
+            data.metrics.cpu_avg !== null ? `${data.metrics.cpu_avg}%` : '-';
+          document.getElementById('avgMemory').textContent = 
+            data.metrics.memory_avg !== null ? `${data.metrics.memory_avg}%` : '-';
+          document.getElementById('dataPoints').textContent = data.metrics.points_24h || '-';
+          
+          document.getElementById('metricsSection').style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Failed to load metrics:', error);
+      }
+    }
+
+    // Show message
+    function showMessage(text, type = 'info') {
+      const resultDiv = document.getElementById('actionResult');
+      resultDiv.innerHTML = `<div class="alert alert-${type}">${text}</div>`;
+      setTimeout(() => resultDiv.innerHTML = '', 5000);
+    }
+
+    // Event listeners
+    document.getElementById('checkStatusBtn').addEventListener('click', checkStatus);
+    document.getElementById('createDashboardsBtn').addEventListener('click', createDashboards);
+
+    // Auto-check status on load
+    checkStatus();
+    
+    // Refresh status every 30 seconds
+    setInterval(checkStatus, 30000);
+  </script>
+</body>
+</html>
