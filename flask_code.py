@@ -4899,9 +4899,9 @@ def index():
     try:
         logging.debug(f"Rendering index for user: {current_user.id}, roles: {[r.value for r in current_user.roles] if current_user.roles else []}")
         logging.debug(f"Devices passed to template: {device_labels}")
-        return render_template('aa.html', devices=device_labels, user=current_user.id)
+        return render_template('index.html', devices=device_labels, user=current_user.id)
     except Exception as te:
-        logging.error(f"Jinja2 template error in aa.html: {te}")
+        logging.error(f"Jinja2 template error in index.html: {te}")
         return jsonify({'error': f"Template error: {str(te)}"}), 500
     except Exception as e:
         logging.error(f"Error rendering index: {e}")
