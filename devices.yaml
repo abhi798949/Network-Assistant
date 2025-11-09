@@ -1,31 +1,112 @@
 devices:
-  - name: R1
-    ip: "192.168.29.201"
-    device_type: "cisco_ios"
-    username: "cisco"
-    password: "admin"
-
-  - name: R2
-    ip: "192.168.29.124"
-    device_type: "cisco_ios"
-    username: "cisco"
-    password: "admin"
-
-  - name: R3
-    ip: "192.168.29.47"
-    device_type: "cisco_ios"
-    username: "cisco"
-    password: "admin"
-
-  - name: R4
-    ip: "192.168.29.223"
-    device_type: "cisco_ios"
-    username: "cisco"
-    password: "admin"
-  
-  - name: RSDMN-55A2-P1
-    ip: "10.253.22.102"
+  - name: MLMV-540-PE1
+    ip: "10.253.22.93"
     device_type: "cisco_xr"
     username: "vayu"
     password: "WWTwwt1!vayu"
-  
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-55A1-P5
+    ip: "10.253.22.92"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-55A1-P4
+    ip: "10.253.22.91"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-57C3-P6
+    ip: "10.235.6.11"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-57C3-P7
+    ip: "10.235.6.12"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-540-P8
+    ip: "10.253.22.73"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-540-P9
+    ip: "10.253.22.74"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-540-PE10
+    ip: "10.253.22.94"
+    device_type: "cisco_xr"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "cisco"
+
+  - name: MLMV-MX304-PE3
+    ip: "10.235.6.30"
+    device_type: "juniper_junos"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "juniper"
+
+  - name: MLMV-MX104-PE12
+    ip: "10.253.22.80"
+    device_type: "juniper_junos"
+    username: "vayu"
+    password: "WWTwwt1!vayu"
+    snmp_community: "sdmnwwt"
+    snmp_port: 161
+    vendor: "juniper"
+
+  - name: XR1
+    ip: "192.168.29.161"
+    device_type: "cisco_xr"
+    username: "cisco"
+    password: "admin123"
+    snmp_community: "public"
+    snmp_port: 161
+    vendor: "cisco" 
+
+  - name: R1
+    ip: "192.168.29.202"
+    device_type: "cisco_ios"
+    username: "cisco"
+    password: "admin"
+    port: 22
+    snmp_community: "public"
+    snmp_port: 161
+    vendor: "cisco"
+
+
+ 
